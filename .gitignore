@@ -1,3 +1,8 @@
 node_modules
 dist
 .DS_Store
+
+# Zugangsdaten – niemals einchecken. Die Vorlage .env.example bleibt drin.
+.env
+.env.*
+!.env.example

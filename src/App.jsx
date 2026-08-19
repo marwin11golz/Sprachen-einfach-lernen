@@ -502,6 +502,12 @@ export default function VokabelTrainer() {
 
       <div style={{ maxWidth: 960, margin: '0 auto', padding: '26px 20px 90px' }}>
 
+        {storageWarning && (
+          <div style={{ background: T.dangerSoft, color: T.danger, border: `1px solid ${T.danger}`, borderRadius: 12, padding: '12px 16px', marginBottom: 18, fontSize: 13.5, lineHeight: 1.5 }}>
+            {storageWarning}
+          </div>
+        )}
+
         {/* ---------- DASHBOARD ---------- */}
         {view === 'dashboard' && (
           <div>
