@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Kommandozeilen-Werkzeug fuer den Spanischcoach.
-// Implementiert dieselbe SM-2-aehnliche Bewertungslogik wie src/App.jsx
+// Implementiert dieselbe SM-2-aehnliche Bewertungslogik wie src/lib/srs.js
 // ("Lucy lernt Sprachen"), damit Karten aus der Chat-Skill und aus der
 // Web-App austauschbar bleiben (gleiches JSON-Format, gleiche Formeln).
 //
@@ -42,7 +42,8 @@ function loadData(dataPath) {
   const raw = fs.readFileSync(dataPath, 'utf8');
   if (!raw.trim()) return { cards: [], activityLog: {} };
   const parsed = JSON.parse(raw);
-  return { cards: parsed.cards || [], activityLog: parsed.activityLog || {} };
+  const cards = (parsed.cards || []).map(migrateCard);
+  return { cards, activityLog: parsed.activityLog || {} };
 }
 
 function saveData(dataPath, data) {
@@ -50,10 +51,22 @@ function saveData(dataPath, data) {
   fs.writeFileSync(dataPath, JSON.stringify(data, null, 2) + '\n', 'utf8');
 }
 
+// Ergaenzt fehlende Felder aus dem alten Format. Der Zeitstempel wird
+// ABGELEITET und nicht auf "jetzt" gesetzt - siehe src/lib/storage.js.
+function migrateCard(c) {
+  const card = { type: 'vocab', ...c };
+  if (!card.updatedAt) {
+    const day = card.lastReviewed || card.createdAt || '1970-01-01';
+    card.updatedAt = `${day}T00:00:00.000Z`;
+  }
+  if (typeof card.deleted !== 'boolean') card.deleted = false;
+  return card;
+}
+
 const todayISO = () => new Date().toISOString().slice(0, 10);
 const uid = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
 
-// Identisch zur rate()-Funktion in src/App.jsx - bewusst dupliziert statt
+// Identisch zur rate()-Funktion in src/lib/srs.js - bewusst dupliziert statt
 // importiert, damit die Skill ohne Build-Schritt als reines Node-Script
 // laeuft und unabhaengig von der React-App bleibt.
 function rate(card, rating) {
@@ -90,6 +103,7 @@ function rate(card, rating) {
   }
   c.lastReviewed = iso(today);
   c.totalReviews = (c.totalReviews || 0) + 1;
+  c.updatedAt = new Date().toISOString();
   return c;
 }
 
@@ -98,6 +112,7 @@ function newCard(fields) {
     id: uid(),
     ease: 2.5, interval: 0, repetitions: 0, dueDate: todayISO(),
     createdAt: todayISO(), lastReviewed: null, totalReviews: 0, correct: 0, wrong: 0,
+    updatedAt: new Date().toISOString(), deleted: false,
     ...fields,
   };
 }
@@ -167,7 +182,8 @@ function deckKeyOf(c) { return c.type === 'gap' ? `gap::${c.language}` : `vocab:
 function cmdDue(args, dataPath) {
   const data = loadData(dataPath);
   const today = todayISO();
-  let pool = args.all ? data.cards : data.cards.filter(c => c.dueDate <= today);
+  const live = data.cards.filter(c => !c.deleted);
+  let pool = args.all ? live : live.filter(c => c.dueDate <= today);
   if (args.deck) pool = pool.filter(c => deckKeyOf(c) === args.deck || (c.type === 'vocab' ? `${c.langA}->${c.langB}` : c.language) === args.deck);
   if (pool.length === 0) { console.log('Keine Karten gefunden.'); return; }
   for (const c of pool) {
@@ -193,10 +209,11 @@ function cmdRate(args, dataPath) {
 function cmdStats(args, dataPath) {
   const data = loadData(dataPath);
   const today = todayISO();
-  const due = data.cards.filter(c => c.dueDate <= today);
-  const learned = data.cards.filter(c => c.repetitions > 0).length;
-  const totalCorrect = data.cards.reduce((s, c) => s + (c.correct || 0), 0);
-  const totalWrong = data.cards.reduce((s, c) => s + (c.wrong || 0), 0);
+  const live = data.cards.filter(c => !c.deleted);
+  const due = live.filter(c => c.dueDate <= today);
+  const learned = live.filter(c => c.repetitions > 0).length;
+  const totalCorrect = live.reduce((s, c) => s + (c.correct || 0), 0);
+  const totalWrong = live.reduce((s, c) => s + (c.wrong || 0), 0);
   const successRate = (totalCorrect + totalWrong) > 0 ? Math.round((totalCorrect / (totalCorrect + totalWrong)) * 100) : 0;
   let streak = 0;
   let d = new Date();
@@ -205,7 +222,7 @@ function cmdStats(args, dataPath) {
     const iso = d.toISOString().slice(0, 10);
     if (data.activityLog[iso] > 0) { streak++; d.setDate(d.getDate() - 1); } else break;
   }
-  console.log(`Karten gesamt:     ${data.cards.length}`);
+  console.log(`Karten gesamt:     ${live.length}`);
   console.log(`Faellig heute:     ${due.length}`);
   console.log(`Gelernt:           ${learned}`);
   console.log(`Trefferquote:      ${successRate}%`);
@@ -214,7 +231,7 @@ function cmdStats(args, dataPath) {
 
 function cmdList(args, dataPath) {
   const data = loadData(dataPath);
-  let cards = data.cards;
+  let cards = data.cards.filter(c => !c.deleted);
   if (args.query) {
     const q = String(args.query).toLowerCase();
     cards = cards.filter(c => (c.type === 'gap' ? `${c.sentence} ${c.back}` : `${c.front} ${c.back}`).toLowerCase().includes(q));

@@ -5,20 +5,26 @@ import {
 } from 'lucide-react';
 
 import {
-  rate, levenshtein, todayISO,
+  levenshtein, todayISO,
   parseGapLine, revealSentence,
   deckKeyOf, deckLabelOf,
   newVocabCard, newGapCard,
   VOCAB_PAIRS, SENTENCE_LANGS,
 } from './lib/srs.js';
 import { THEMES, hexToRgba, btnPrimary, btnSecondary, ratingBtn } from './lib/theme.js';
+import { useVocabStore } from './hooks/useVocabStore.js';
 
 export default function VokabelTrainer() {
+  // Karten, Lernaktivität und Speicherung liegen komplett im Store.
+  const {
+    cards, allCards, activity,
+    flipped, setFlipped,
+    loaded, storageWarning,
+    addCards, rateCard, deleteCard, importData,
+  } = useVocabStore();
+
   const [theme, setTheme] = useState('light');
   const [view, setView] = useState('dashboard');
-  const [cards, setCards] = useState([]);
-  const [activity, setActivity] = useState({});
-  const [loaded, setLoaded] = useState(false);
   const [toast, setToast] = useState(null);
 
   const [addTab, setAddTab] = useState('vocab');
@@ -33,7 +39,6 @@ export default function VokabelTrainer() {
   const [queue, setQueue] = useState([]);
   const [current, setCurrent] = useState(null);
   const [revealed, setRevealed] = useState(false);
-  const [flipped, setFlipped] = useState(false);
   const [writeInput, setWriteInput] = useState('');
   const [writeResult, setWriteResult] = useState(null);
 
@@ -46,44 +51,10 @@ export default function VokabelTrainer() {
   const sentenceFileRef = useRef(null);
   const importFileRef = useRef(null);
 
-  const [storageWarning, setStorageWarning] = useState(null);
-  const STORAGE_KEY = 'lucy-lernt-sprachen-vocab-data';
-
-  // --- Laden ---
-  // Nutzt normales Browser-localStorage. Läuft zuverlässig in einer echten,
-  // eigenständig gehosteten/lokal laufenden App. In der Claude-Vorschau kann
-  // localStorage aus Sicherheitsgründen eingeschränkt sein.
+  // Dunkles Design nach Systemeinstellung.
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        setCards((parsed.cards || []).map(c => ({ type: 'vocab', ...c })));
-        setActivity(parsed.activityLog || {});
-        if (typeof parsed.flipped === 'boolean') setFlipped(parsed.flipped);
-      }
-    } catch (e) {
-      setStorageWarning('Lokaler Speicher nicht verfügbar (z. B. privates Fenster) – Änderungen werden nicht dauerhaft gesichert.');
-    }
-    setLoaded(true);
     if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) setTheme('dark');
   }, []);
-
-  const persistNow = React.useCallback(() => {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify({ cards, activityLog: activity, flipped }));
-      setStorageWarning(null);
-    } catch (e) {
-      setStorageWarning(`Speichern fehlgeschlagen (${String(e && e.message ? e.message : e)}) – bitte Vokabeln vorsichtshalber per Export sichern.`);
-    }
-  }, [cards, activity, flipped]);
-
-  // --- Speichern ---
-  useEffect(() => {
-    if (!loaded) return;
-    const t = setTimeout(() => { persistNow(); }, 300);
-    return () => clearTimeout(t);
-  }, [cards, activity, flipped, loaded]);
 
   const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(null), 2200); };
 
@@ -108,7 +79,7 @@ export default function VokabelTrainer() {
       newCards.push(newVocabCard({ front, back, langA: pair.a, langB: pair.b }));
     }
     if (newCards.length === 0) { showToast('Keine gültigen Zeilen erkannt (Format: Wort = Übersetzung)'); return; }
-    setCards(prev => [...prev, ...newCards]);
+    addCards(newCards);
     setAddText('');
     showToast(`${newCards.length} Vokabel${newCards.length > 1 ? 'n' : ''} hinzugefügt`);
   };
@@ -124,7 +95,7 @@ export default function VokabelTrainer() {
       newCards.push(newGapCard({ sentence: parsed.sentence, answer: parsed.answer, language }));
     }
     if (newCards.length === 0) { showToast('Keine gültigen Zeilen erkannt (Wort in [eckigen Klammern] markieren)'); return; }
-    setCards(prev => [...prev, ...newCards]);
+    addCards(newCards);
     setSentenceText('');
     showToast(`${newCards.length} Satz${newCards.length > 1 ? 'sätze' : ''} hinzugefügt`);
   };
@@ -217,13 +188,12 @@ export default function VokabelTrainer() {
     if (view === 'study' && queue.length === 0 && current) setCurrent(null);
   }, [queue, view, current]);
 
-  const logActivity = () => setActivity(prev => ({ ...prev, [todayISO()]: (prev[todayISO()] || 0) + 1 }));
-
   const submitRating = (ratingKey) => {
     if (!current) return;
-    const updated = rate(current, ratingKey);
-    setCards(prev => prev.map(c => c.id === current.id ? updated : c));
-    logActivity();
+    // Der Store bewertet die aktuell gespeicherte Karte, nicht die
+    // Momentaufnahme aus der Warteschlange, und zaehlt den Lerntag mit.
+    const updated = rateCard(current.id, ratingKey);
+    if (!updated) { setCurrent(null); return; }
     let rest = queue.slice(1);
     if (ratingKey === 'again') {
       const pos = Math.min(rest.length, 3);
@@ -278,14 +248,14 @@ export default function VokabelTrainer() {
     return list.slice().reverse();
   }, [cards, search, filter]);
 
-  const deleteCard = (id) => setCards(prev => prev.filter(c => c.id !== id));
 
   const [exportText, setExportText] = useState(null);
   const [importPasteText, setImportPasteText] = useState('');
   const exportTextareaRef = useRef(null);
 
   const exportJSON = () => {
-    setExportText(JSON.stringify({ cards, activityLog: activity }, null, 2));
+    // Grabsteine kommen bewusst mit, damit ein Import auch Loeschungen uebernimmt.
+    setExportText(JSON.stringify({ schemaVersion: 2, cards: allCards, activityLog: activity, flipped }, null, 2));
   };
 
   const copyExportText = async () => {
@@ -303,14 +273,8 @@ export default function VokabelTrainer() {
   const applyImportedData = (raw, sourceLabel) => {
     try {
       const parsed = JSON.parse(raw || '{}');
-      const importedCards = (parsed.cards || []).map(c => ({ type: 'vocab', ...c }));
-      setCards(prev => {
-        const known = new Set(prev.map(c => c.id));
-        const merged = [...prev, ...importedCards.filter(c => !known.has(c.id))];
-        return merged;
-      });
-      setActivity(prev => ({ ...prev, ...(parsed.activityLog || {}) }));
-      showToast(`${importedCards.length} Karte(n) ${sourceLabel} eingelesen`);
+      const count = importData(parsed);
+      showToast(`${count} Karte(n) ${sourceLabel} eingelesen`);
       return true;
     } catch (err) {
       showToast('Inhalt konnte nicht gelesen werden – ist es eine gültige Export-Sicherung?');
