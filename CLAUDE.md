@@ -9,11 +9,16 @@ npm install     # install dependencies
 npm run dev     # start Vite dev server (http://localhost:5173)
 npm run build   # production build to dist/
 npm run preview # serve the production build (needed to exercise the service worker)
+npm test        # logic tests — plain Node, no install, no browser
 ```
 
 Cloud sync needs `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` in `.env.local` (template: `.env.example`; `.env*` is gitignored). Without them `cloudConfigured` is `false`, `supabase` is `null`, and the app deliberately runs local-only rather than crashing — so both states are worth testing after touching the sync layer.
 
-There is no lint, format, or test tooling configured — no ESLint/Prettier config, no test runner. Verify with `npm run build` (catches syntax/import errors) plus throwaway Node/Playwright scripts driving a real browser (Chromium at `/opt/pw-browsers/chromium`). The pure modules (`lib/srs.js`, `lib/merge.js`, `lib/sync.js`) are importable straight from Node, and `syncOnce()` takes its database client as an argument specifically so it can be exercised against a stub with no network.
+No lint or format tooling and no test framework — `npm test` is a plain Node runner over `tests/*.test.mjs`, with hand-rolled assertions and no dependencies. It covers the two places where a bug silently costs user data: the merge rules (`lib/merge.js`, `lib/storage.js` migration) and the sync algorithm (`lib/sync.js`). **Run it before and after touching either.** `syncOnce()` takes its database client as an argument specifically so the whole algorithm can be driven against a stub with no network.
+
+`tests/browser/` holds Playwright tests for what needs a real browser — migration of stored data, the app end to end, PWA and offline. They are excluded from `npm test` because they need a separate install; see `tests/browser/README.md`. `app.test.cjs` is worth running in both `MODE=mit` and `MODE=ohne` (with and without `.env.local`), since the no-credentials path is the one that must degrade instead of crashing.
+
+Also run `npm run build` — it is the only check that catches syntax and import errors across the UI, which the tests do not touch.
 
 ## Architecture
 

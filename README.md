@@ -14,6 +14,14 @@ Dann die angezeigte Adresse (z. B. http://localhost:5173) im Browser öffnen.
 2. Auf vercel.com mit GitHub einloggen → "Add New Project" → dieses Repo auswählen → "Deploy".
 3. Fertig – du bekommst eine öffentliche URL. Auf dem Handy: URL öffnen → "Zum Startbildschirm hinzufügen".
 
+## Tests
+```bash
+npm test
+```
+Prüft die Lernlogik, die Zusammenführ-Regeln und den Geräte-Abgleich. Braucht keine Installation und kein Internet – sinnvollerweise vor jeder Änderung an diesen Teilen einmal laufen lassen.
+
+Tests, die einen echten Browser brauchen (Migration alter Daten, App-Installation, Offline-Betrieb), liegen in `tests/browser/` und werden dort erklärt.
+
 ## Auf dem Handy installieren
 Die App ist eine PWA und lässt sich wie eine echte App installieren:
 
