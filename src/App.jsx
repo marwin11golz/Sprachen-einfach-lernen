@@ -326,7 +326,7 @@ export default function VokabelTrainer() {
 
       {/* Top Nav */}
       <div style={{ borderBottom: `1px solid ${T.border}`, position: 'sticky', top: 0, background: T.bg, zIndex: 10 }}>
-        <div style={{ maxWidth: 960, margin: '0 auto', padding: '14px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10 }}>
+        <div style={{ maxWidth: 960, margin: '0 auto', padding: 'calc(14px + env(safe-area-inset-top)) 20px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10 }}>
           <div className="disp" style={{ fontSize: 20, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 8 }}>
             <Layers size={19} color={T.accent} /> Lucy lernt Sprachen
           </div>
@@ -354,7 +354,7 @@ export default function VokabelTrainer() {
         </div>
       </div>
 
-      <div style={{ maxWidth: 960, margin: '0 auto', padding: '26px 20px 90px' }}>
+      <div style={{ maxWidth: 960, margin: '0 auto', padding: '26px 20px calc(90px + env(safe-area-inset-bottom))' }}>
 
         {storageWarning && (
           <div style={{ background: T.dangerSoft, color: T.danger, border: `1px solid ${T.danger}`, borderRadius: 12, padding: '12px 16px', marginBottom: 18, fontSize: 13.5, lineHeight: 1.5 }}>
