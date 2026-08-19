@@ -15,21 +15,30 @@ There is no lint, format, or test tooling configured in this repo — no ESLint/
 
 ## Architecture
 
-This is a single-page Vite + React app, "Lucy lernt Sprachen" — a flashcard-based vocabulary trainer with spaced repetition. It intentionally has no backend, no router, and no state-management library: nearly the entire app lives in one component tree in `src/App.jsx` (~900 lines), mounted by `src/main.jsx`.
+This is a single-page Vite + React app, "Lucy lernt Sprachen" — a flashcard-based vocabulary trainer with spaced repetition. It intentionally has no router and no state-management library. Data is local-first (`localStorage`), with cloud sync as an optional layer on top.
 
-### `src/App.jsx` structure
+### Module layout
 
-- **SM-2-like spaced repetition core** — `rate(card, rating)` near the top of the file computes the next `ease`/`interval`/`dueDate`/`repetitions` for a card given a rating (`again`/`hard`/`good`/`easy`). This function is the single source of truth for the scheduling algorithm; it's duplicated (not imported) in `.claude/skills/spanischcoach/scripts/vocab.js` so that skill can run without a build step — **when changing the rating logic, update both places.**
-- **Two card types** share one array (`cards` state): `vocab` cards (`front`/`back`/`langA`/`langB`) and `gap` cards (fill-in-the-blank sentences, parsed from lines like `Yo [como] fruta.` via `parseGapLine`/`maskSentence`/`revealSentence`). `deckKeyOf`/`deckLabelOf` group cards into "decks" (e.g. `vocab::Spanisch→Deutsch`, `gap::Spanisch`) for the dashboard and study-session filters.
-- **Persistence**: all state (`cards`, `activity` log, `flipped` display preference) is debounce-saved to `localStorage` under the key `lucy-lernt-sprachen-vocab-data` (see the `useEffect` persistence block). This only works in a real browser context — it's unreliable inside sandboxed/iframed previews, which the code has a comment about. Export/import (JSON, via copy-paste or file) exists as a manual backup path since there's no server sync.
-- **Views** are toggled via a single `view` state (`dashboard` / `add` / `study` / `browse`) rather than a router — each is a conditionally-rendered block within the same return statement.
-- **Study session flow**: `startStudy(deckKey, label, onlyDue)` builds a shuffled `queue` from `cards`, then a `useEffect` pulls the next card into `current`. Rating a card via `submitRating` calls `rate()`, updates `cards`, logs today's activity (for the streak/heatmap), and advances the queue (an "again" rating re-inserts the card a few positions ahead instead of removing it).
-- **Answer checking** for typed/gap answers uses `levenshtein()` with a tolerance proportional to answer length, so minor typos still count as correct.
-- Inline styles + a `THEMES` object (light/dark palettes) are used throughout instead of a CSS framework; there's no separate stylesheet beyond a `<style>` block for fonts/scrollbars.
+The data layer is deliberately separated from the UI so that database work and design work don't collide:
+
+- **`src/lib/srs.js`** — the domain logic: `rate(card, rating)` (the SM-2-like scheduler computing `ease`/`interval`/`dueDate`/`repetitions` from a rating of `again`/`hard`/`good`/`easy`), `levenshtein()`, the gap-sentence helpers (`parseGapLine`/`maskSentence`/`revealSentence`), `deckKeyOf`/`deckLabelOf`, and the card factories `newVocabCard`/`newGapCard`. **This is the single source of truth for the card shape and the scheduling algorithm.** `rate()` and the card shape are duplicated (not imported) in `.claude/skills/spanischcoach/scripts/vocab.js` so that skill runs as a dependency-free Node script — **changes here must be mirrored there.**
+- **`src/lib/storage.js`** — `localStorage` read/write plus schema migration. Persisted shape (v2): `{ schemaVersion, cards, activityLocal, activityRemote, flipped, lastUserId, lastSyncAt }` under the key `lucy-lernt-sprachen-vocab-data`.
+- **`src/lib/merge.js`** — `mergeCards()` (per-card last-write-wins on `updatedAt`), `combinedActivity()`, `purgeOldTombstones()`. Used both by the import path and by cloud sync, so there is exactly one merge rule.
+- **`src/lib/theme.js`** — `THEMES` (light/dark palettes) and the button style helpers. Inline styles throughout; no CSS framework.
+- **`src/hooks/useVocabStore.js`** — owns `cards`, activity, `flipped`, persistence. It exposes **only intent-based actions** (`addCards`, `rateCard`, `deleteCard`, `importData`), never a raw `setCards` — that is what guarantees every mutation stamps `updatedAt`.
+- **`src/App.jsx`** — UI only: the four views (`dashboard` / `add` / `study` / `browse`) toggled via a single `view` state, each a conditionally-rendered block in one return statement.
+
+### Sync-critical invariants
+
+- **Every card carries `updatedAt`** (full ISO timestamp) and **`deleted`** (tombstone flag). Deleting sets `deleted: true` rather than removing the card — otherwise the other device resurrects it on the next merge.
+- **Migration derives `updatedAt` from `lastReviewed`/`createdAt`, never from `Date.now()`.** Both devices hold copies of the same legacy cards, so stamping "now" would let whichever device opens the app second win every card and silently overwrite the other's review progress. Deterministic derivation produces a tie instead, which `pickWinner()` resolves in favour of higher `totalReviews` — a tie must never cost progress.
+- **Activity is split into `activityLocal` (this device) and `activityRemote` (sum of others)**; only `activityLocal` is ever pushed. Pushing the combined value would make the counts inflate on every sync.
+- `useVocabStore` keeps a `revision` counter bumped only by real user edits — applying a remote state must not bump it, or every pull would trigger a push.
 
 ### `.claude/skills/spanischcoach/`
 
 A Claude Code skill that lets Claude act as a chat-based Spanish coach, sharing the app's data model and SM-2 formulas so cards are interchangeable between the app and chat sessions:
 
-- `scripts/vocab.js` — dependency-free Node ESM CLI (`add-vocab`, `add-gap`, `due`, `rate`, `stats`, `list`) that reads/writes `data/spanischcoach/vocab.json` in the same shape as the app's JSON export (`{ cards: [...], activityLog: {...} }`). Card ratings should always go through this script rather than being computed by hand, so results stay bit-for-bit consistent with `rate()` in `App.jsx`.
+- `scripts/vocab.js` — dependency-free Node ESM CLI (`add-vocab`, `add-gap`, `due`, `rate`, `stats`, `list`) that reads/writes `data/spanischcoach/vocab.json` in the same shape as the app's JSON export. Card ratings should always go through this script rather than being computed by hand, so results stay bit-for-bit consistent with `rate()` in `src/lib/srs.js`.
 - The app's "Karten → Export/Import" feature is the bridge for moving cards between `localStorage` (browser) and `data/spanischcoach/vocab.json` (repo/chat).
+

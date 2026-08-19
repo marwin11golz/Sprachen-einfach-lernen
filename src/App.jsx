@@ -4,122 +4,38 @@ import {
   Download, Trash2, Volume2, Upload, BookOpen, PenLine, ChevronRight, Repeat,
 } from 'lucide-react';
 
-// ---------- SM-2-ähnlicher Spaced-Repetition-Kern ----------
-function rate(card, rating) {
-  const c = { ...card };
-  const today = new Date();
-  const iso = (d) => d.toISOString().slice(0, 10);
-
-  if (rating === 'again') {
-    c.ease = Math.max(1.3, c.ease - 0.2);
-    c.repetitions = 0;
-    c.interval = 0;
-    c.dueDate = iso(today);
-    c.wrong += 1;
-  } else {
-    c.correct += 1;
-    if (rating === 'hard') {
-      c.ease = Math.max(1.3, c.ease - 0.15);
-      c.interval = Math.max(1, Math.round((c.interval || 1) * 1.2));
-    } else if (rating === 'good') {
-      c.repetitions += 1;
-      if (c.repetitions === 1) c.interval = 1;
-      else if (c.repetitions === 2) c.interval = 6;
-      else c.interval = Math.round(c.interval * c.ease);
-    } else if (rating === 'easy') {
-      c.ease = Math.min(3.0, c.ease + 0.15);
-      c.repetitions += 1;
-      c.interval = Math.round((c.interval || 1) * c.ease * 1.3) + 1;
-    }
-    const due = new Date(today);
-    due.setDate(due.getDate() + c.interval);
-    c.dueDate = iso(due);
-  }
-  c.lastReviewed = iso(today);
-  c.totalReviews = (c.totalReviews || 0) + 1;
-  return c;
-}
-
-function levenshtein(a, b) {
-  a = a.trim().toLowerCase(); b = b.trim().toLowerCase();
-  const m = a.length, n = b.length;
-  const dp = Array.from({ length: m + 1 }, () => new Array(n + 1).fill(0));
-  for (let i = 0; i <= m; i++) dp[i][0] = i;
-  for (let j = 0; j <= n; j++) dp[0][j] = j;
-  for (let i = 1; i <= m; i++)
-    for (let j = 1; j <= n; j++)
-      dp[i][j] = a[i - 1] === b[j - 1] ? dp[i - 1][j - 1] : 1 + Math.min(dp[i - 1][j - 1], dp[i - 1][j], dp[i][j - 1]);
-  return dp[m][n];
-}
-
-const todayISO = () => new Date().toISOString().slice(0, 10);
-const uid = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
-
-// ---------- Lückensatz-Helfer ----------
-// Format: "Yo [como] fruta todos los días." -> das Wort in Klammern ist die Lösung.
-function parseGapLine(line) {
-  const m = line.match(/\[([^\]]+)\]/);
-  if (!m) return null;
-  const answer = m[1].trim();
-  if (!answer) return null;
-  return { sentence: line.trim(), answer };
-}
-function maskSentence(sentence) {
-  return sentence.replace(/\[([^\]]+)\]/, (_, w) => '▁'.repeat(Math.max(3, Math.min(10, w.length))));
-}
-function revealSentence(sentence) {
-  return sentence.replace(/\[([^\]]+)\]/, (_, w) => `${w}`);
-}
-
-function deckKeyOf(c) { return c.type === 'gap' ? `gap::${c.language}` : `vocab::${c.langA}→${c.langB}`; }
-function deckLabelOf(c) { return c.type === 'gap' ? `Sätze · ${c.language}` : `${c.langA} → ${c.langB}`; }
-
-function hexToRgba(hex, alpha) {
-  const h = hex.replace('#', '');
-  const bigint = parseInt(h.length === 3 ? h.split('').map(x => x + x).join('') : h, 16);
-  const r = (bigint >> 16) & 255, g = (bigint >> 8) & 255, b = bigint & 255;
-  return `rgba(${r},${g},${b},${alpha})`;
-}
-
-const VOCAB_PAIRS = [
-  { label: 'Spanisch → Deutsch', a: 'Spanisch', b: 'Deutsch' },
-  { label: 'Deutsch → Spanisch', a: 'Deutsch', b: 'Spanisch' },
-  { label: 'Englisch → Deutsch', a: 'Englisch', b: 'Deutsch' },
-  { label: 'Deutsch → Englisch', a: 'Deutsch', b: 'Englisch' },
-  { label: 'Japanisch → Deutsch', a: 'Japanisch', b: 'Deutsch' },
-  { label: 'Französisch → Deutsch', a: 'Französisch', b: 'Deutsch' },
-  { label: 'Sonstige', a: 'Sprache 1', b: 'Sprache 2' },
-];
-const SENTENCE_LANGS = ['Spanisch', 'Englisch', 'Französisch', 'Deutsch', 'Japanisch', 'Sonstige'];
-
-// ---------- Sprachpass-Farbwelt ----------
-const THEMES = {
-  light: {
-    bg: '#F1F2ED', bgElev: '#FFFFFF', ink: '#161C18', inkSoft: '#666F67',
-    border: '#DDE2D8', accent: '#1F5C4D', accentSoft: '#E1EEE8',
-    gold: '#B8863B', goldSoft: '#F7EEDC',
-    blue: '#33517A', blueSoft: '#E4EAF2',
-    danger: '#A23B4C', dangerSoft: '#F6E3E6',
-    success: '#2E7D5B', successSoft: '#E0F0E7',
-    shadow: '0 1px 2px rgba(20,30,20,.05), 0 10px 28px rgba(20,30,20,.06)',
-  },
-  dark: {
-    bg: '#0F1310', bgElev: '#171D17', ink: '#EBEEE7', inkSoft: '#8D968B',
-    border: '#262E24', accent: '#4FAF8E', accentSoft: '#17322A',
-    gold: '#D9A75C', goldSoft: '#2C2210',
-    blue: '#7C9BC7', blueSoft: '#1C2634',
-    danger: '#E28A96', dangerSoft: '#341A1E',
-    success: '#57C08C', successSoft: '#12291F',
-    shadow: '0 1px 2px rgba(0,0,0,.35), 0 10px 28px rgba(0,0,0,.35)',
-  },
-};
+import {
+  levenshtein, todayISO,
+  parseGapLine, revealSentence,
+  deckKeyOf, deckLabelOf,
+  newVocabCard, newGapCard,
+  VOCAB_PAIRS, SENTENCE_LANGS,
+} from './lib/srs.js';
+import { THEMES, hexToRgba, btnPrimary, btnSecondary, ratingBtn } from './lib/theme.js';
+import { useVocabStore } from './hooks/useVocabStore.js';
+import { useAuth } from './hooks/useAuth.js';
+import { useCloudSync } from './hooks/useCloudSync.js';
+import AuthScreen from './ui/AuthScreen.jsx';
+import SyncBadge from './ui/SyncBadge.jsx';
 
 export default function VokabelTrainer() {
-  const [theme, setTheme] = useState('light');
   const [view, setView] = useState('dashboard');
-  const [cards, setCards] = useState([]);
-  const [activity, setActivity] = useState({});
-  const [loaded, setLoaded] = useState(false);
+
+  // Karten, Lernaktivität und Speicherung liegen komplett im Store.
+  const store = useVocabStore();
+  const {
+    cards, allCards, activity,
+    flipped, setFlipped,
+    loaded, storageWarning,
+    addCards, rateCard, deleteCard, importData,
+  } = store;
+
+  const auth = useAuth();
+  // Während einer Lernsitzung wird nicht abgeglichen: ein Fernstand dürfte
+  // sonst eine gerade bewertete Karte überschreiben.
+  const sync = useCloudSync({ store, userId: auth.userId, paused: view === 'study' });
+
+  const [theme, setTheme] = useState('light');
   const [toast, setToast] = useState(null);
 
   const [addTab, setAddTab] = useState('vocab');
@@ -134,7 +50,6 @@ export default function VokabelTrainer() {
   const [queue, setQueue] = useState([]);
   const [current, setCurrent] = useState(null);
   const [revealed, setRevealed] = useState(false);
-  const [flipped, setFlipped] = useState(false);
   const [writeInput, setWriteInput] = useState('');
   const [writeResult, setWriteResult] = useState(null);
 
@@ -147,44 +62,10 @@ export default function VokabelTrainer() {
   const sentenceFileRef = useRef(null);
   const importFileRef = useRef(null);
 
-  const [storageWarning, setStorageWarning] = useState(null);
-  const STORAGE_KEY = 'lucy-lernt-sprachen-vocab-data';
-
-  // --- Laden ---
-  // Nutzt normales Browser-localStorage. Läuft zuverlässig in einer echten,
-  // eigenständig gehosteten/lokal laufenden App. In der Claude-Vorschau kann
-  // localStorage aus Sicherheitsgründen eingeschränkt sein.
+  // Dunkles Design nach Systemeinstellung.
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        setCards((parsed.cards || []).map(c => ({ type: 'vocab', ...c })));
-        setActivity(parsed.activityLog || {});
-        if (typeof parsed.flipped === 'boolean') setFlipped(parsed.flipped);
-      }
-    } catch (e) {
-      setStorageWarning('Lokaler Speicher nicht verfügbar (z. B. privates Fenster) – Änderungen werden nicht dauerhaft gesichert.');
-    }
-    setLoaded(true);
     if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) setTheme('dark');
   }, []);
-
-  const persistNow = React.useCallback(() => {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify({ cards, activityLog: activity, flipped }));
-      setStorageWarning(null);
-    } catch (e) {
-      setStorageWarning(`Speichern fehlgeschlagen (${String(e && e.message ? e.message : e)}) – bitte Vokabeln vorsichtshalber per Export sichern.`);
-    }
-  }, [cards, activity, flipped]);
-
-  // --- Speichern ---
-  useEffect(() => {
-    if (!loaded) return;
-    const t = setTimeout(() => { persistNow(); }, 300);
-    return () => clearTimeout(t);
-  }, [cards, activity, flipped, loaded]);
 
   const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(null), 2200); };
 
@@ -206,14 +87,10 @@ export default function VokabelTrainer() {
         front = parts[0].trim(); back = parts.slice(1).join(',').trim();
       } else continue;
       if (!front || !back) continue;
-      newCards.push({
-        id: uid(), type: 'vocab', front, back, langA: pair.a, langB: pair.b,
-        ease: 2.5, interval: 0, repetitions: 0, dueDate: todayISO(),
-        createdAt: todayISO(), lastReviewed: null, totalReviews: 0, correct: 0, wrong: 0,
-      });
+      newCards.push(newVocabCard({ front, back, langA: pair.a, langB: pair.b }));
     }
     if (newCards.length === 0) { showToast('Keine gültigen Zeilen erkannt (Format: Wort = Übersetzung)'); return; }
-    setCards(prev => [...prev, ...newCards]);
+    addCards(newCards);
     setAddText('');
     showToast(`${newCards.length} Vokabel${newCards.length > 1 ? 'n' : ''} hinzugefügt`);
   };
@@ -226,15 +103,10 @@ export default function VokabelTrainer() {
     for (const line of lines) {
       const parsed = parseGapLine(line);
       if (!parsed) continue;
-      newCards.push({
-        id: uid(), type: 'gap', sentence: parsed.sentence, front: maskSentence(parsed.sentence),
-        back: parsed.answer, language,
-        ease: 2.5, interval: 0, repetitions: 0, dueDate: todayISO(),
-        createdAt: todayISO(), lastReviewed: null, totalReviews: 0, correct: 0, wrong: 0,
-      });
+      newCards.push(newGapCard({ sentence: parsed.sentence, answer: parsed.answer, language }));
     }
     if (newCards.length === 0) { showToast('Keine gültigen Zeilen erkannt (Wort in [eckigen Klammern] markieren)'); return; }
-    setCards(prev => [...prev, ...newCards]);
+    addCards(newCards);
     setSentenceText('');
     showToast(`${newCards.length} Satz${newCards.length > 1 ? 'sätze' : ''} hinzugefügt`);
   };
@@ -327,13 +199,12 @@ export default function VokabelTrainer() {
     if (view === 'study' && queue.length === 0 && current) setCurrent(null);
   }, [queue, view, current]);
 
-  const logActivity = () => setActivity(prev => ({ ...prev, [todayISO()]: (prev[todayISO()] || 0) + 1 }));
-
   const submitRating = (ratingKey) => {
     if (!current) return;
-    const updated = rate(current, ratingKey);
-    setCards(prev => prev.map(c => c.id === current.id ? updated : c));
-    logActivity();
+    // Der Store bewertet die aktuell gespeicherte Karte, nicht die
+    // Momentaufnahme aus der Warteschlange, und zaehlt den Lerntag mit.
+    const updated = rateCard(current.id, ratingKey);
+    if (!updated) { setCurrent(null); return; }
     let rest = queue.slice(1);
     if (ratingKey === 'again') {
       const pos = Math.min(rest.length, 3);
@@ -388,14 +259,14 @@ export default function VokabelTrainer() {
     return list.slice().reverse();
   }, [cards, search, filter]);
 
-  const deleteCard = (id) => setCards(prev => prev.filter(c => c.id !== id));
 
   const [exportText, setExportText] = useState(null);
   const [importPasteText, setImportPasteText] = useState('');
   const exportTextareaRef = useRef(null);
 
   const exportJSON = () => {
-    setExportText(JSON.stringify({ cards, activityLog: activity }, null, 2));
+    // Grabsteine kommen bewusst mit, damit ein Import auch Loeschungen uebernimmt.
+    setExportText(JSON.stringify({ schemaVersion: 2, cards: allCards, activityLog: activity, flipped }, null, 2));
   };
 
   const copyExportText = async () => {
@@ -413,14 +284,8 @@ export default function VokabelTrainer() {
   const applyImportedData = (raw, sourceLabel) => {
     try {
       const parsed = JSON.parse(raw || '{}');
-      const importedCards = (parsed.cards || []).map(c => ({ type: 'vocab', ...c }));
-      setCards(prev => {
-        const known = new Set(prev.map(c => c.id));
-        const merged = [...prev, ...importedCards.filter(c => !known.has(c.id))];
-        return merged;
-      });
-      setActivity(prev => ({ ...prev, ...(parsed.activityLog || {}) }));
-      showToast(`${importedCards.length} Karte(n) ${sourceLabel} eingelesen`);
+      const count = importData(parsed);
+      showToast(`${count} Karte(n) ${sourceLabel} eingelesen`);
       return true;
     } catch (err) {
       showToast('Inhalt konnte nicht gelesen werden – ist es eine gültige Export-Sicherung?');
@@ -472,7 +337,7 @@ export default function VokabelTrainer() {
 
       {/* Top Nav */}
       <div style={{ borderBottom: `1px solid ${T.border}`, position: 'sticky', top: 0, background: T.bg, zIndex: 10 }}>
-        <div style={{ maxWidth: 960, margin: '0 auto', padding: '14px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10 }}>
+        <div style={{ maxWidth: 960, margin: '0 auto', padding: 'calc(14px + env(safe-area-inset-top)) 20px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10 }}>
           <div className="disp" style={{ fontSize: 20, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 8 }}>
             <Layers size={19} color={T.accent} /> Lucy lernt Sprachen
           </div>
@@ -492,6 +357,7 @@ export default function VokabelTrainer() {
                 <Icon size={15} /> {label}
               </button>
             ))}
+            <SyncBadge T={T} state={sync.syncState} onClick={() => setView('account')} />
             <button className="nav-btn" onClick={() => setTheme(t => t === 'light' ? 'dark' : 'light')}
               style={{ padding: 8, borderRadius: 9, border: `1px solid ${T.border}`, background: T.bgElev, cursor: 'pointer', color: T.ink }}>
               {theme === 'light' ? <Moon size={15} /> : <Sun size={15} />}
@@ -500,7 +366,40 @@ export default function VokabelTrainer() {
         </div>
       </div>
 
-      <div style={{ maxWidth: 960, margin: '0 auto', padding: '26px 20px 90px' }}>
+      <div style={{ maxWidth: 960, margin: '0 auto', padding: '26px 20px calc(90px + env(safe-area-inset-bottom))' }}>
+
+        {storageWarning && (
+          <div style={{ background: T.dangerSoft, color: T.danger, border: `1px solid ${T.danger}`, borderRadius: 12, padding: '12px 16px', marginBottom: 18, fontSize: 13.5, lineHeight: 1.5 }}>
+            {storageWarning}
+          </div>
+        )}
+
+        {sync.accountConflict && (
+          <div style={{ background: T.goldSoft, color: T.ink, border: `1px solid ${T.gold}`, borderRadius: 12, padding: '14px 16px', marginBottom: 18, fontSize: 13.5, lineHeight: 1.6 }}>
+            <strong>Anderes Konto erkannt.</strong> Auf diesem Gerät liegen
+            {' '}{sync.accountConflict.cardCount} Karte(n), die zu einem anderen Konto gehören.
+            Sollen sie in das jetzt angemeldete Konto übernommen werden?
+            <div style={{ display: 'flex', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
+              <button onClick={() => sync.resolveAccountConflict(true)} style={{ ...btnPrimary(T), padding: '9px 16px', fontSize: 13 }}>
+                Übernehmen
+              </button>
+              <button onClick={() => sync.resolveAccountConflict(false)} style={{ ...btnSecondary(T), padding: '9px 16px', fontSize: 13 }}>
+                Nicht übernehmen
+              </button>
+            </div>
+            <div style={{ fontSize: 11.5, color: T.inkSoft, marginTop: 10 }}>
+              Eine Sicherungskopie des lokalen Standes wurde vorher automatisch angelegt.
+            </div>
+          </div>
+        )}
+
+        {/* ---------- KONTO ---------- */}
+        {view === 'account' && (
+          <AuthScreen
+            T={T} auth={auth} sync={sync} cardCount={cards.length}
+            onBack={() => setView('dashboard')}
+          />
+        )}
 
         {/* ---------- DASHBOARD ---------- */}
         {view === 'dashboard' && (
@@ -885,14 +784,4 @@ export default function VokabelTrainer() {
       )}
     </div>
   );
-}
-
-function btnPrimary(T) {
-  return { background: T.accent, color: '#fff', border: 'none', padding: '11px 20px', borderRadius: 10, fontSize: 14, fontWeight: 600, cursor: 'pointer', display: 'inline-flex', alignItems: 'center' };
-}
-function btnSecondary(T) {
-  return { background: T.bgElev, color: T.ink, border: `1px solid ${T.border}`, padding: '11px 20px', borderRadius: 10, fontSize: 14, fontWeight: 600, cursor: 'pointer', display: 'inline-flex', alignItems: 'center' };
-}
-function ratingBtn(color, bg) {
-  return { background: bg, color, border: 'none', borderRadius: 10, padding: '10px 4px', fontSize: 13, fontWeight: 600, cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 };
 }
