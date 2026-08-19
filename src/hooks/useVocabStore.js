@@ -17,6 +17,9 @@ export function useVocabStore() {
   const [activityLocal, setActivityLocal] = useState({});
   const [activityRemote, setActivityRemote] = useState({});
   const [flipped, setFlipped] = useState(false);
+  const [prefsUpdatedAt, setPrefsUpdatedAt] = useState(null);
+  const [lastUserId, setLastUserId] = useState(null);
+  const [lastSyncAt, setLastSyncAt] = useState(null);
   const [loaded, setLoaded] = useState(false);
   const [storageWarning, setStorageWarning] = useState(null);
 
@@ -32,6 +35,9 @@ export function useVocabStore() {
     setActivityLocal(state.activityLocal);
     setActivityRemote(state.activityRemote);
     setFlipped(state.flipped);
+    setPrefsUpdatedAt(state.prefsUpdatedAt);
+    setLastUserId(state.lastUserId);
+    setLastSyncAt(state.lastSyncAt);
     if (warning) setStorageWarning(warning);
     setLoaded(true);
   }, []);
@@ -40,11 +46,14 @@ export function useVocabStore() {
   useEffect(() => {
     if (!loaded) return;
     const t = setTimeout(() => {
-      const res = saveLocal({ cards: allCards, activityLocal, activityRemote, flipped });
+      const res = saveLocal({
+        cards: allCards, activityLocal, activityRemote,
+        flipped, prefsUpdatedAt, lastUserId, lastSyncAt,
+      });
       setStorageWarning(res.ok ? null : res.warning);
     }, 300);
     return () => clearTimeout(t);
-  }, [allCards, activityLocal, activityRemote, flipped, loaded]);
+  }, [allCards, activityLocal, activityRemote, flipped, prefsUpdatedAt, lastUserId, lastSyncAt, loaded]);
 
   // Immer der zuletzt festgeschriebene Stand - damit rateCard die aktuelle
   // Karte bewertet und nicht eine veraltete Momentaufnahme aus der Warteschlange.
@@ -105,19 +114,25 @@ export function useVocabStore() {
 
   const setFlippedTracked = useCallback((valueOrFn) => {
     setFlipped(valueOrFn);
+    setPrefsUpdatedAt(new Date().toISOString());
     bump();
   }, [bump]);
 
-  // Wird in P4 vom Cloud-Abgleich benutzt: setzt den zusammengeführten Stand,
-  // ohne die Revision zu bewegen.
-  const applyRemote = useCallback(({ cards: mergedCards, activityRemote: remote }) => {
-    if (mergedCards) setAllCards(mergedCards);
-    if (remote) setActivityRemote(remote);
+  // Wird vom Cloud-Abgleich benutzt: setzt den zusammengeführten Stand, OHNE
+  // die Revision zu bewegen - sonst würde jeder Abruf ein Hochladen auslösen.
+  const applyRemote = useCallback((next) => {
+    if (next.cards) setAllCards(next.cards);
+    if (next.activityRemote) setActivityRemote(next.activityRemote);
+    if (typeof next.flipped === 'boolean') setFlipped(next.flipped);
+    if (next.prefsUpdatedAt !== undefined) setPrefsUpdatedAt(next.prefsUpdatedAt);
+    if (next.lastSyncAt !== undefined) setLastSyncAt(next.lastSyncAt);
+    if (next.lastUserId !== undefined) setLastUserId(next.lastUserId);
   }, []);
 
   return {
     cards, allCards, activity, activityLocal,
     flipped, setFlipped: setFlippedTracked,
+    prefsUpdatedAt, lastUserId, lastSyncAt,
     loaded, storageWarning,
     revision,
     addCards, rateCard, deleteCard, importData, applyRemote,

@@ -28,6 +28,7 @@ function emptyState() {
     activityLocal: {},
     activityRemote: {},
     flipped: false,
+    prefsUpdatedAt: null,
     lastUserId: null,
     lastSyncAt: null,
   };
@@ -110,6 +111,7 @@ export function loadLocal() {
     activityLocal: parsed.activityLocal || parsed.activityLog || {},
     activityRemote: parsed.activityRemote || {},
     flipped: typeof parsed.flipped === 'boolean' ? parsed.flipped : false,
+    prefsUpdatedAt: parsed.prefsUpdatedAt || null,
     lastUserId: parsed.lastUserId || null,
     lastSyncAt: parsed.lastSyncAt || null,
   };
@@ -125,6 +127,7 @@ export function saveLocal(state) {
       activityLocal: state.activityLocal,
       activityRemote: state.activityRemote,
       flipped: state.flipped,
+      prefsUpdatedAt: state.prefsUpdatedAt ?? null,
       lastUserId: state.lastUserId ?? null,
       lastSyncAt: state.lastSyncAt ?? null,
     }));

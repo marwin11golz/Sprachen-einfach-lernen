@@ -13,18 +13,29 @@ import {
 } from './lib/srs.js';
 import { THEMES, hexToRgba, btnPrimary, btnSecondary, ratingBtn } from './lib/theme.js';
 import { useVocabStore } from './hooks/useVocabStore.js';
+import { useAuth } from './hooks/useAuth.js';
+import { useCloudSync } from './hooks/useCloudSync.js';
+import AuthScreen from './ui/AuthScreen.jsx';
+import SyncBadge from './ui/SyncBadge.jsx';
 
 export default function VokabelTrainer() {
+  const [view, setView] = useState('dashboard');
+
   // Karten, Lernaktivität und Speicherung liegen komplett im Store.
+  const store = useVocabStore();
   const {
     cards, allCards, activity,
     flipped, setFlipped,
     loaded, storageWarning,
     addCards, rateCard, deleteCard, importData,
-  } = useVocabStore();
+  } = store;
+
+  const auth = useAuth();
+  // Während einer Lernsitzung wird nicht abgeglichen: ein Fernstand dürfte
+  // sonst eine gerade bewertete Karte überschreiben.
+  const sync = useCloudSync({ store, userId: auth.userId, paused: view === 'study' });
 
   const [theme, setTheme] = useState('light');
-  const [view, setView] = useState('dashboard');
   const [toast, setToast] = useState(null);
 
   const [addTab, setAddTab] = useState('vocab');
@@ -346,6 +357,7 @@ export default function VokabelTrainer() {
                 <Icon size={15} /> {label}
               </button>
             ))}
+            <SyncBadge T={T} state={sync.syncState} onClick={() => setView('account')} />
             <button className="nav-btn" onClick={() => setTheme(t => t === 'light' ? 'dark' : 'light')}
               style={{ padding: 8, borderRadius: 9, border: `1px solid ${T.border}`, background: T.bgElev, cursor: 'pointer', color: T.ink }}>
               {theme === 'light' ? <Moon size={15} /> : <Sun size={15} />}
@@ -360,6 +372,33 @@ export default function VokabelTrainer() {
           <div style={{ background: T.dangerSoft, color: T.danger, border: `1px solid ${T.danger}`, borderRadius: 12, padding: '12px 16px', marginBottom: 18, fontSize: 13.5, lineHeight: 1.5 }}>
             {storageWarning}
           </div>
+        )}
+
+        {sync.accountConflict && (
+          <div style={{ background: T.goldSoft, color: T.ink, border: `1px solid ${T.gold}`, borderRadius: 12, padding: '14px 16px', marginBottom: 18, fontSize: 13.5, lineHeight: 1.6 }}>
+            <strong>Anderes Konto erkannt.</strong> Auf diesem Gerät liegen
+            {' '}{sync.accountConflict.cardCount} Karte(n), die zu einem anderen Konto gehören.
+            Sollen sie in das jetzt angemeldete Konto übernommen werden?
+            <div style={{ display: 'flex', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
+              <button onClick={() => sync.resolveAccountConflict(true)} style={{ ...btnPrimary(T), padding: '9px 16px', fontSize: 13 }}>
+                Übernehmen
+              </button>
+              <button onClick={() => sync.resolveAccountConflict(false)} style={{ ...btnSecondary(T), padding: '9px 16px', fontSize: 13 }}>
+                Nicht übernehmen
+              </button>
+            </div>
+            <div style={{ fontSize: 11.5, color: T.inkSoft, marginTop: 10 }}>
+              Eine Sicherungskopie des lokalen Standes wurde vorher automatisch angelegt.
+            </div>
+          </div>
+        )}
+
+        {/* ---------- KONTO ---------- */}
+        {view === 'account' && (
+          <AuthScreen
+            T={T} auth={auth} sync={sync} cardCount={cards.length}
+            onBack={() => setView('dashboard')}
+          />
         )}
 
         {/* ---------- DASHBOARD ---------- */}
