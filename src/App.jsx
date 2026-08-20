@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
-  Plus, Search, BarChart3, Layers, CheckCircle2, XCircle, Sun, Moon,
-  Download, Trash2, Volume2, Upload, BookOpen, PenLine, ChevronRight, Repeat,
+  Plus, Search, BarChart3, Layers, CheckCircle2, XCircle, Sun, Moon, X,
+  Download, Trash2, Volume2, Upload, BookOpen, PenLine, ChevronRight, Repeat, Flame,
 } from 'lucide-react';
 
 import {
@@ -11,12 +11,45 @@ import {
   newVocabCard, newGapCard,
   VOCAB_PAIRS, SENTENCE_LANGS,
 } from './lib/srs.js';
-import { THEMES, hexToRgba, SPACE, RADIUS, FONT, btnPrimary, btnSecondary, btnGhost, ratingBtn } from './lib/theme.js';
+import {
+  THEMES, hexToRgba, SPACE, RADIUS, FONT, NAVBAR_H,
+  btnPrimary, btnSecondary, btnGhost, ratingBtn, surface,
+} from './lib/theme.js';
 import { useVocabStore } from './hooks/useVocabStore.js';
 import { useAuth } from './hooks/useAuth.js';
 import { useCloudSync } from './hooks/useCloudSync.js';
 import AuthScreen from './ui/AuthScreen.jsx';
 import SyncBadge from './ui/SyncBadge.jsx';
+
+// Fortschrittsring fuer den Einstieg ins Lernen. Bewusst als SVG von Hand
+// statt per Bibliothek - es ist ein Kreis, das rechtfertigt keine Abhaengigkeit.
+function ProgressRing({ percent, size = 148, stroke = 10, track, color, children }) {
+  const r = (size - stroke) / 2;
+  const circumference = 2 * Math.PI * r;
+  const dash = (Math.max(0, Math.min(100, percent)) / 100) * circumference;
+  return (
+    <div style={{ position: 'relative', width: size, height: size, flexShrink: 0 }}>
+      <svg width={size} height={size} style={{ transform: 'rotate(-90deg)' }}>
+        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke={track} strokeWidth={stroke} />
+        {/* Bei 0 % gar nichts zeichnen - die runde Kappe wuerde sonst als Punkt
+            stehen bleiben und wie ein angefangener Fortschritt aussehen. */}
+        {dash > 0 && (
+          <circle
+            cx={size / 2} cy={size / 2} r={r} fill="none" stroke={color} strokeWidth={stroke}
+            strokeLinecap="round" strokeDasharray={`${dash} ${circumference - dash}`}
+            style={{ transition: 'stroke-dasharray .5s ease' }}
+          />
+        )}
+      </svg>
+      <div style={{
+        position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column',
+        alignItems: 'center', justifyContent: 'center', gap: 2,
+      }}>
+        {children}
+      </div>
+    </div>
+  );
+}
 
 export default function VokabelTrainer() {
   const [view, setView] = useState('dashboard');
@@ -144,6 +177,7 @@ export default function VokabelTrainer() {
   const totalCorrect = cards.reduce((s, c) => s + (c.correct || 0), 0);
   const totalWrong = cards.reduce((s, c) => s + (c.wrong || 0), 0);
   const successRate = totalReviewsAll > 0 ? Math.round((totalCorrect / (totalCorrect + totalWrong || 1)) * 100) : 0;
+  const reviewsToday = activity[todayISO()] || 0;
 
   const streak = useMemo(() => {
     let s = 0;
@@ -155,6 +189,11 @@ export default function VokabelTrainer() {
     }
     return s;
   }, [activity]);
+
+  // Tagesfortschritt fuer den Ring: erledigte gegenueber dem, was heute
+  // insgesamt anstand (erledigt + noch offen).
+  const dayGoal = reviewsToday + dueCards.length;
+  const dayPercent = dayGoal > 0 ? (reviewsToday / dayGoal) * 100 : 0;
 
   // GitHub-artige Stempel-Heatmap: 12 Wochen x 7 Tage
   const heatmap = useMemo(() => {
@@ -343,87 +382,305 @@ export default function VokabelTrainer() {
     } catch (e) {}
   };
 
-  const sessionProgress = sessionTotal > 0 ? Math.max(0, Math.min(100, Math.round(((sessionTotal - queue.length) / sessionTotal) * 100))) : 0;
+  const sessionDone = sessionTotal - queue.length;
+  const sessionProgress = sessionTotal > 0 ? Math.max(0, Math.min(100, (sessionDone / sessionTotal) * 100)) : 0;
+
+  const inputStyle = {
+    width: '100%', padding: '13px 15px', borderRadius: RADIUS.md,
+    border: `1px solid ${T.border}`, background: T.bgElev, color: T.ink,
+    fontSize: FONT.md, outline: 'none',
+  };
+
+  const globalCss = `
+    @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
+    * { box-sizing: border-box; }
+    .mono { font-family: 'IBM Plex Mono', monospace; font-variant-numeric: tabular-nums; }
+    button { font-family: inherit; }
+    ::selection { background: ${T.accentSoft}; }
+    input, textarea, select { font-family: inherit; }
+    input:focus, textarea:focus, select:focus { border-color: ${T.accent}; }
+    ::-webkit-scrollbar { height: 8px; width: 8px; }
+    ::-webkit-scrollbar-thumb { background: ${T.border}; border-radius: 4px; }
+
+    .press:active { transform: scale(.97); }
+    .row-link { transition: border-color .15s, background .15s; }
+    .row-link:hover { border-color: ${T.accent}; }
+    .stamp:hover { outline: 1px solid ${T.accent}; }
+
+    /* Die Lernkarte kommt bei jedem Wechsel kurz herein - das macht den
+       Kartenwechsel sichtbar, ohne den Lernfluss zu bremsen. */
+    @keyframes cardIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+    .card-in { animation: cardIn .22s ease-out; }
+    @keyframes riseIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+    .rise-in { animation: riseIn .2s ease-out; }
+    @media (prefers-reduced-motion: reduce) {
+      .card-in, .rise-in { animation: none; }
+      .press:active { transform: none; }
+    }
+
+    .dash-grid { display: grid; grid-template-columns: minmax(0,1.35fr) minmax(0,1fr); gap: ${SPACE.lg}px; align-items: start; }
+    .hero { display: flex; align-items: center; gap: ${SPACE.xl}px; }
+    .hero-actions { flex: 1; min-width: 0; }
+    .deck-actions { display: flex; align-items: center; gap: ${SPACE.md}px; flex-shrink: 0; }
+
+    /* Auf dem Handy sitzt die Navigation unten wie in einer App, am grossen
+       Fenster oben - dort waere eine Leiste am unteren Rand nur weit weg. */
+    /* Die Sichtbarkeit beider Navigationen haengt nur an diesen Regeln - kein
+       inline display, sonst schlaegt es die Umbruchregel und beide sind da. */
+    .nav-bottom { display: none; }
+    .nav-top-links { display: flex; gap: ${SPACE.xs}px; }
+    .brand-full { display: inline; }
+    .page { max-width: 980px; margin: 0 auto; padding: ${SPACE.xl}px ${SPACE.lg}px ${SPACE.xxl}px; }
+    @media (max-width: 720px) {
+      .dash-grid { grid-template-columns: minmax(0,1fr); }
+      .hero { flex-direction: column; text-align: center; gap: ${SPACE.lg}px; }
+      .hero-actions { width: 100%; }
+      .nav-top-links { display: none; }
+      .nav-bottom { display: flex; }
+      .brand { font-size: ${FONT.lg}px; }
+      /* Nur wenn die Leiste unten wirklich sichtbar ist, muss der Inhalt ihr ausweichen. */
+      .page { padding-bottom: calc(${NAVBAR_H + SPACE.xl}px + env(safe-area-inset-bottom)); }
+    }
+    @media (max-width: 380px) {
+      .brand-full { display: none; }
+    }
+    @media (max-width: 460px) {
+      .deck-head { flex-wrap: wrap; }
+      .deck-actions { width: 100%; justify-content: space-between; }
+    }
+  `;
+
+  // ---------- Lernansicht: eigener Vollbild-Layer ohne Navigation ----------
+  if (view === 'study') {
+    return (
+      <div style={{
+        position: 'fixed', inset: 0, background: T.bg, color: T.ink,
+        fontFamily: "'IBM Plex Sans', sans-serif", display: 'flex', flexDirection: 'column',
+      }}>
+        <style>{globalCss}</style>
+
+        {/* Kopfzeile: schliessen, Fortschritt, Zaehler */}
+        <div style={{
+          padding: `calc(${SPACE.md}px + env(safe-area-inset-top)) ${SPACE.lg}px ${SPACE.md}px`,
+          display: 'flex', alignItems: 'center', gap: SPACE.md, flexShrink: 0,
+        }}>
+          <button className="press" onClick={() => setView('dashboard')} aria-label="Lernen beenden"
+            style={{ background: 'none', border: 'none', cursor: 'pointer', color: T.inkSoft, padding: 4, display: 'flex' }}>
+            <X size={22} />
+          </button>
+          <div style={{ flex: 1, height: 6, borderRadius: RADIUS.pill, background: T.border, overflow: 'hidden' }}>
+            <div style={{ height: '100%', width: `${sessionProgress}%`, background: T.accent, borderRadius: RADIUS.pill, transition: 'width .3s ease' }} />
+          </div>
+          <div className="mono" style={{ fontSize: FONT.base, color: T.inkSoft, flexShrink: 0 }}>
+            {Math.min(sessionDone + 1, sessionTotal)}/{sessionTotal}
+          </div>
+        </div>
+
+        {!current ? (
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: SPACE.xl, textAlign: 'center' }}>
+            <div style={{
+              width: 84, height: 84, borderRadius: RADIUS.pill, background: T.successSoft,
+              display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: SPACE.lg,
+            }}>
+              <CheckCircle2 size={42} color={T.success} />
+            </div>
+            <div style={{ fontSize: FONT.xxl, fontWeight: 700, marginBottom: SPACE.sm }}>Geschafft</div>
+            <div style={{ color: T.inkSoft, marginBottom: SPACE.xl, fontSize: FONT.md, maxWidth: 320, lineHeight: 1.6 }}>
+              {sessionTotal} Karte{sessionTotal !== 1 ? 'n' : ''}{deckLabel ? ` in „${deckLabel}“` : ''} für heute erledigt.
+            </div>
+            <button className="press" onClick={() => setView('dashboard')} style={btnPrimary(T, 'lg')}>Zum Dashboard</button>
+          </div>
+        ) : (
+          <>
+            {/* Karte */}
+            <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: `0 ${SPACE.lg}px`, minHeight: 0, overflowY: 'auto' }}>
+              <div key={current.id + String(revealed)} className="card-in" style={{
+                ...surface(T, { lift: true }),
+                width: '100%', maxWidth: 520, textAlign: 'center',
+                padding: `${SPACE.xxl}px ${SPACE.xl}px`,
+              }}>
+                <div className="mono" style={{ fontSize: FONT.xs, color: T.inkSoft, letterSpacing: '.08em', textTransform: 'uppercase', marginBottom: SPACE.lg }}>
+                  {current.type === 'gap' ? `Satz · ${current.language}` : `${flipped ? current.langB : current.langA} → ${flipped ? current.langA : current.langB}`}
+                </div>
+
+                <div style={{ fontSize: current.type === 'gap' ? 24 : 34, fontWeight: 600, lineHeight: 1.35, letterSpacing: '-.01em' }}>
+                  {displayFront}
+                </div>
+
+                {(!isWriteInteraction || revealed) && (
+                  <button className="press" onClick={() => speak(current.type === 'gap' ? revealSentence(current.sentence) : displayFront)}
+                    aria-label="Vorlesen"
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: T.inkSoft, marginTop: SPACE.md, padding: 6 }}>
+                    <Volume2 size={20} />
+                  </button>
+                )}
+
+                {!isWriteInteraction && revealed && (
+                  <div className="rise-in" style={{ marginTop: SPACE.xl, paddingTop: SPACE.xl, borderTop: `1px solid ${T.border}` }}>
+                    <div style={{ fontSize: 30, color: T.accent, fontWeight: 600, lineHeight: 1.35 }}>{displayBack}</div>
+                  </div>
+                )}
+
+                {isWriteInteraction && (
+                  <div style={{ marginTop: SPACE.xl }}>
+                    {!revealed ? (
+                      <div style={{ display: 'flex', gap: SPACE.sm, justifyContent: 'center', flexWrap: 'wrap' }}>
+                        <input autoFocus value={writeInput} onChange={e => setWriteInput(e.target.value)}
+                          onKeyDown={e => e.key === 'Enter' && checkWrite()}
+                          placeholder={current.type === 'gap' ? 'fehlende Form eingeben…' : 'Übersetzung eingeben…'}
+                          style={{ ...inputStyle, flex: 1, minWidth: 200, maxWidth: 300, textAlign: 'center', fontSize: FONT.lg }} />
+                        <button className="press" onClick={checkWrite} style={btnPrimary(T)}>Prüfen</button>
+                      </div>
+                    ) : (
+                      <div className="rise-in">
+                        <div style={{
+                          display: 'inline-flex', alignItems: 'center', gap: SPACE.sm, fontWeight: 600,
+                          color: writeResult?.ok ? T.success : T.danger, background: writeResult?.ok ? T.successSoft : T.dangerSoft,
+                          padding: '8px 16px', borderRadius: RADIUS.pill, fontSize: FONT.md,
+                        }}>
+                          {writeResult?.ok ? <CheckCircle2 size={17} /> : <XCircle size={17} />}
+                          {writeResult?.ok ? 'Richtig' : 'Nicht ganz'}
+                        </div>
+                        <div style={{ fontSize: 24, marginTop: SPACE.lg, fontWeight: 600, lineHeight: 1.4 }}>
+                          {current.type === 'gap' ? revealSentence(current.sentence) : displayBack}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Aktionsleiste unten - dort, wo der Daumen ohnehin liegt */}
+            <div style={{
+              flexShrink: 0, padding: `${SPACE.lg}px ${SPACE.lg}px calc(${SPACE.lg}px + env(safe-area-inset-bottom))`,
+              borderTop: `1px solid ${T.border}`, background: T.bgElev,
+            }}>
+              <div style={{ maxWidth: 520, margin: '0 auto' }}>
+                {!revealed ? (
+                  <>
+                    {!isWriteInteraction && (
+                      <button className="press" onClick={() => setRevealed(true)} style={{ ...btnPrimary(T, 'lg'), width: '100%' }}>
+                        Aufdecken
+                      </button>
+                    )}
+                    <div style={{ display: 'flex', justifyContent: 'center', gap: SPACE.lg, marginTop: SPACE.md }}>
+                      {current.type === 'vocab' && (
+                        <>
+                          <button className="press" onClick={() => setFlipped(f => !f)} style={btnGhost(T)}>
+                            <Repeat size={13} /> Umdrehen
+                          </button>
+                          <button className="press" onClick={() => setStudyMode(m => m === 'classic' ? 'write' : 'classic')} style={btnGhost(T)}>
+                            {studyMode === 'classic' ? 'Tippen' : 'Aufdecken'}
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  </>
+                ) : (
+                  <div className="rise-in" style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: SPACE.sm }}>
+                    {[
+                      ['again', 'Nochmal', T.danger, T.dangerSoft, '1'],
+                      ['hard', 'Schwer', T.gold, T.goldSoft, '2'],
+                      ['good', 'Gut', T.success, T.successSoft, '3'],
+                      ['easy', 'Einfach', T.accent, T.accentSoft, '4'],
+                    ].map(([key, label, color, bg, num]) => (
+                      <button key={key} className="press" onClick={() => submitRating(key)} style={ratingBtn(color, bg)}>
+                        {label}<span className="mono" style={{ fontSize: FONT.xs, opacity: .65 }}>{num}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </>
+        )}
+
+        {toast && (
+          <div style={{
+            position: 'fixed', bottom: `calc(120px + env(safe-area-inset-bottom))`, left: '50%', transform: 'translateX(-50%)',
+            background: T.ink, color: T.bg, padding: '11px 20px', borderRadius: RADIUS.pill,
+            fontSize: FONT.md, maxWidth: '90vw', textAlign: 'center', boxShadow: T.shadowLift, zIndex: 50,
+          }}>
+            {toast}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // ---------- Normale Ansichten mit Navigation ----------
+  const navItems = [
+    ['dashboard', 'Start', BarChart3],
+    ['add', 'Hinzufügen', Plus],
+    ['browse', 'Karten', Search],
+  ];
 
   return (
-    <div style={{ background: T.bg, color: T.ink, minHeight: '100%', width: '100%', overflowX: 'hidden', fontFamily: "'IBM Plex Sans', sans-serif", transition: 'background .25s,color .25s' }}>
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
-        * { box-sizing: border-box; }
-        .mono { font-family: 'IBM Plex Mono', monospace; }
-        button { font-family: inherit; }
-        ::selection { background: ${T.accentSoft}; }
-        .nav-btn:hover { opacity: .78; }
-        .deck-row:hover { border-color: ${T.accent}; }
-        .stamp:hover { outline: 1px solid ${T.accent}; }
-        input, textarea, select { font-family: inherit; }
-        ::-webkit-scrollbar { height: 8px; width: 8px; }
-        .dash-grid { display: grid; grid-template-columns: minmax(0,1.3fr) minmax(0,1fr); gap: ${SPACE.lg}px; }
-        .deck-actions { display: flex; flex-direction: column; align-items: flex-end; gap: ${SPACE.xs}px; flex-shrink: 0; }
-        @media (max-width: 720px) {
-          .dash-grid { grid-template-columns: minmax(0,1fr); }
-        }
-        /* Auf Handybreite passen Text und beide Knoepfe nicht mehr nebeneinander -
-           die Knoepfe ruecken unter die Kartenbox-Angaben statt rechts herauszulaufen. */
-        @media (max-width: 460px) {
-          .deck-head { flex-wrap: wrap; }
-          .deck-actions { flex-direction: row; align-items: center; width: 100%; justify-content: flex-end; gap: ${SPACE.md}px; }
-        }
-      `}</style>
+    <div style={{
+      background: T.bg, color: T.ink, minHeight: '100%', width: '100%', overflowX: 'hidden',
+      fontFamily: "'IBM Plex Sans', sans-serif", transition: 'background .25s, color .25s',
+    }}>
+      <style>{globalCss}</style>
 
-      {/* Top Nav */}
-      <div style={{ borderBottom: `1px solid ${T.border}`, position: 'sticky', top: 0, background: T.bg, zIndex: 10 }}>
-        <div style={{ maxWidth: 960, margin: '0 auto', padding: 'calc(14px + env(safe-area-inset-top)) 20px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10 }}>
-          <div style={{ fontSize: FONT.xxl, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 8 }}>
-            <Layers size={19} color={T.accent} /> Sprachen lernen
-          </div>
-          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
-            {[
-              ['dashboard', 'Dashboard', BarChart3],
-              ['add', 'Hinzufügen', Plus],
-              ['browse', 'Karten', Search],
-            ].map(([key, label, Icon]) => (
-              <button key={key} className="nav-btn" onClick={() => setView(key)}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px', borderRadius: RADIUS.sm,
-                  border: 'none', cursor: 'pointer', fontSize: FONT.base, fontWeight: 500,
-                  background: view === key ? T.accentSoft : 'transparent',
-                  color: view === key ? T.accent : T.inkSoft,
-                }}>
-                <Icon size={15} /> {label}
-              </button>
-            ))}
+      {/* Kopfzeile */}
+      <div style={{ borderBottom: `1px solid ${T.border}`, position: 'sticky', top: 0, background: hexToRgba(T.bg, .92), backdropFilter: 'blur(10px)', zIndex: 10 }}>
+        <div style={{
+          maxWidth: 980, margin: '0 auto',
+          padding: `calc(${SPACE.md}px + env(safe-area-inset-top)) ${SPACE.lg}px ${SPACE.md}px`,
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: SPACE.md,
+        }}>
+          <button className="brand" onClick={() => setView('dashboard')} style={{
+            background: 'none', border: 'none', cursor: 'pointer', color: T.ink, padding: 0,
+            fontSize: FONT.xl, fontWeight: 700, display: 'flex', alignItems: 'center', gap: SPACE.sm,
+            letterSpacing: '-.01em', whiteSpace: 'nowrap',
+          }}>
+            <Layers size={20} color={T.accent} />
+            <span>Sprachen<span className="brand-full"> lernen</span></span>
+          </button>
+
+          <div style={{ display: 'flex', gap: SPACE.xs, alignItems: 'center' }}>
+            <div className="nav-top-links">
+              {navItems.map(([key, label, Icon]) => (
+                <button key={key} className="press" onClick={() => setView(key)}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 6, padding: '9px 15px', borderRadius: RADIUS.pill,
+                    border: 'none', cursor: 'pointer', fontSize: FONT.md, fontWeight: 500,
+                    background: view === key ? T.accentSoft : 'transparent',
+                    color: view === key ? T.accent : T.inkSoft, transition: 'background .15s, color .15s',
+                  }}>
+                  <Icon size={16} /> {label}
+                </button>
+              ))}
+            </div>
             <SyncBadge T={T} state={sync.syncState} onClick={() => setView('account')} />
-            <button className="nav-btn" onClick={() => setTheme(t => t === 'light' ? 'dark' : 'light')}
-              style={{ padding: 8, borderRadius: RADIUS.sm, border: `1px solid ${T.border}`, background: T.bgElev, cursor: 'pointer', color: T.ink }}>
-              {theme === 'light' ? <Moon size={15} /> : <Sun size={15} />}
+            <button className="press" onClick={() => setTheme(t => t === 'light' ? 'dark' : 'light')}
+              aria-label="Design wechseln"
+              style={{ padding: 9, borderRadius: RADIUS.pill, border: `1px solid ${T.border}`, background: T.bgElev, cursor: 'pointer', color: T.ink, display: 'flex' }}>
+              {theme === 'light' ? <Moon size={16} /> : <Sun size={16} />}
             </button>
           </div>
         </div>
       </div>
 
-      <div style={{ maxWidth: 960, margin: '0 auto', padding: '26px 20px calc(90px + env(safe-area-inset-bottom))' }}>
+      <div className="page">
 
         {storageWarning && (
-          <div style={{ background: T.dangerSoft, color: T.danger, border: `1px solid ${T.danger}`, borderRadius: RADIUS.lg, padding: '12px 16px', marginBottom: 18, fontSize: FONT.base, lineHeight: 1.5 }}>
+          <div style={{ background: T.dangerSoft, color: T.danger, border: `1px solid ${T.danger}`, borderRadius: RADIUS.lg, padding: `${SPACE.md}px ${SPACE.lg}px`, marginBottom: SPACE.lg, fontSize: FONT.md, lineHeight: 1.5 }}>
             {storageWarning}
           </div>
         )}
 
         {sync.accountConflict && (
-          <div style={{ background: T.goldSoft, color: T.ink, border: `1px solid ${T.gold}`, borderRadius: RADIUS.lg, padding: '14px 16px', marginBottom: 18, fontSize: FONT.base, lineHeight: 1.6 }}>
+          <div style={{ background: T.goldSoft, color: T.ink, border: `1px solid ${T.gold}`, borderRadius: RADIUS.lg, padding: `${SPACE.lg}px`, marginBottom: SPACE.lg, fontSize: FONT.md, lineHeight: 1.6 }}>
             <strong>Anderes Konto erkannt.</strong> Auf diesem Gerät liegen
             {' '}{sync.accountConflict.cardCount} Karte(n), die zu einem anderen Konto gehören.
             Sollen sie in das jetzt angemeldete Konto übernommen werden?
-            <div style={{ display: 'flex', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
-              <button onClick={() => sync.resolveAccountConflict(true)} style={btnPrimary(T, 'sm')}>
-                Übernehmen
-              </button>
-              <button onClick={() => sync.resolveAccountConflict(false)} style={btnSecondary(T, 'sm')}>
-                Nicht übernehmen
-              </button>
+            <div style={{ display: 'flex', gap: SPACE.sm, marginTop: SPACE.md, flexWrap: 'wrap' }}>
+              <button className="press" onClick={() => sync.resolveAccountConflict(true)} style={btnPrimary(T, 'sm')}>Übernehmen</button>
+              <button className="press" onClick={() => sync.resolveAccountConflict(false)} style={btnSecondary(T, 'sm')}>Nicht übernehmen</button>
             </div>
-            <div style={{ fontSize: FONT.xs, color: T.inkSoft, marginTop: 10 }}>
+            <div style={{ fontSize: FONT.xs, color: T.inkSoft, marginTop: SPACE.sm }}>
               Eine Sicherungskopie des lokalen Standes wurde vorher automatisch angelegt.
             </div>
           </div>
@@ -431,170 +688,190 @@ export default function VokabelTrainer() {
 
         {/* ---------- KONTO ---------- */}
         {view === 'account' && (
-          <AuthScreen
-            T={T} auth={auth} sync={sync} cardCount={cards.length}
-            onBack={() => setView('dashboard')}
-          />
+          <AuthScreen T={T} auth={auth} sync={sync} cardCount={cards.length} onBack={() => setView('dashboard')} />
         )}
 
         {/* ---------- DASHBOARD ---------- */}
         {view === 'dashboard' && (
           <div>
-            {/* Quick-Suche direkt im Dashboard */}
-            <div style={{ position: 'relative', marginBottom: 20 }}>
-              <Search size={16} style={{ position: 'absolute', left: 14, top: 13, color: T.inkSoft }} />
-              <input
-                value={dashSearch}
-                onChange={e => setDashSearch(e.target.value)}
-                onKeyDown={e => { if (e.key === 'Enter' && dashSearch.trim()) goSearch(dashSearch.trim()); }}
-                placeholder="Karten durchsuchen und zur Kartenansicht springen…"
-                style={{ width: '100%', padding: '12px 14px 12px 38px', borderRadius: RADIUS.lg, border: `1px solid ${T.border}`, background: T.bgElev, color: T.ink, fontSize: FONT.md, boxShadow: T.shadow }}
-              />
+            {/* Einstieg: was heute ansteht, und ein Knopf, der es startet */}
+            <div style={{ ...surface(T, { lift: true }), padding: SPACE.xl, marginBottom: SPACE.lg }}>
+              <div className="hero">
+                <ProgressRing
+                  percent={dayPercent} track={T.accentSoft} color={T.accent}
+                  size={148} stroke={11}
+                >
+                  <div className="mono" style={{ fontSize: FONT.hero, fontWeight: 600, lineHeight: 1, color: dueCards.length > 0 ? T.accent : T.inkSoft }}>
+                    {dueCards.length}
+                  </div>
+                  <div style={{ fontSize: FONT.sm, color: T.inkSoft }}>fällig</div>
+                </ProgressRing>
+
+                <div className="hero-actions">
+                  <div style={{ fontSize: FONT.xxl, fontWeight: 700, letterSpacing: '-.02em', marginBottom: SPACE.xs }}>
+                    {dueCards.length > 0 ? 'Bereit zum Lernen' : reviewsToday > 0 ? 'Für heute erledigt' : 'Nichts fällig'}
+                  </div>
+                  <div style={{ color: T.inkSoft, fontSize: FONT.md, marginBottom: SPACE.lg, lineHeight: 1.6 }}>
+                    {dueCards.length > 0
+                      ? <>{newCardsCount} neu · {reviewCount} Wiederholung{reviewCount !== 1 ? 'en' : ''}{reviewsToday > 0 ? ` · ${reviewsToday} heute geschafft` : ''}</>
+                      : reviewsToday > 0
+                        ? <>{reviewsToday} Karte{reviewsToday !== 1 ? 'n' : ''} heute wiederholt. Morgen geht's weiter.</>
+                        : <>Unter „Hinzufügen“ Vokabeln anlegen, dann kann's losgehen.</>}
+                  </div>
+                  <div style={{ display: 'flex', gap: SPACE.sm, flexWrap: 'wrap' }}>
+                    <button className="press" onClick={() => startStudy(null, null)} disabled={dueCards.length === 0}
+                      style={{ ...btnPrimary(T, 'lg'), opacity: dueCards.length === 0 ? .45 : 1, cursor: dueCards.length === 0 ? 'default' : 'pointer' }}>
+                      Lernen starten <ChevronRight size={18} />
+                    </button>
+                    <button className="press" onClick={() => startStudy(null, null, false)} disabled={cards.length === 0}
+                      style={{ ...btnSecondary(T, 'lg'), opacity: cards.length === 0 ? .45 : 1 }}>
+                      <Repeat size={16} /> Alle
+                    </button>
+                  </div>
+                </div>
+              </div>
             </div>
 
-            {/* Stat-Kacheln */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(124px,1fr))', gap: SPACE.sm, marginBottom: SPACE.xl }}>
+            {/* Kennzahlen - eine kompakte Zeile statt sechs gleich lauter Kacheln */}
+            <div style={{ ...surface(T), display: 'flex', marginBottom: SPACE.lg, overflow: 'hidden' }}>
               {[
-                ['Fällig heute', dueCards.length, T.accent],
-                ['Neue Karten', newCardsCount, T.gold],
-                ['Wiederholungen', reviewCount, T.blue],
-                // Einheit bewusst kleiner als die Zahl - sonst sprengt "0 Tage" in
-                // grosser Schrift die schmale Kachel und wird abgeschnitten.
-                ['Streak', <>{streak}<span style={{ fontSize: FONT.sm, fontWeight: 500 }}> Tage</span></>, T.danger],
-                ['Gelernt', learnedCount, T.ink],
-                ['Trefferquote', `${successRate}%`, T.success],
-              ].map(([label, val, color]) => (
-                <div key={label} style={{ background: T.bgElev, border: `1px solid ${T.border}`, borderRadius: RADIUS.lg, padding: '14px 16px', boxShadow: T.shadow, minWidth: 0 }}>
-                  <div style={{ fontSize: FONT.xs, color: T.inkSoft, marginBottom: 6, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{label}</div>
-                  <div className="mono" style={{ fontSize: FONT.xxl, fontWeight: 600, color, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{val}</div>
+                [<Flame size={15} key="i" />, 'Streak', `${streak}`, streak > 0 ? T.danger : T.inkSoft, streak === 1 ? 'Tag' : 'Tage'],
+                [null, 'Gelernt', `${learnedCount}`, T.ink, `von ${cards.length}`],
+                [null, 'Trefferquote', `${successRate}`, T.success, '%'],
+              ].map(([icon, label, val, color, unit], i) => (
+                <div key={label} style={{
+                  flex: 1, padding: `${SPACE.lg}px ${SPACE.md}px`, textAlign: 'center', minWidth: 0,
+                  borderLeft: i > 0 ? `1px solid ${T.border}` : 'none',
+                }}>
+                  <div style={{ fontSize: FONT.xs, color: T.inkSoft, marginBottom: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
+                    {icon}{label}
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'center', gap: 3 }}>
+                    <span className="mono" style={{ fontSize: FONT.xxl, fontWeight: 600, color }}>{val}</span>
+                    <span style={{ fontSize: FONT.sm, color: T.inkSoft }}>{unit}</span>
+                  </div>
                 </div>
               ))}
             </div>
 
             <div className="dash-grid">
-              {/* Kartenboxen / Decks */}
               <div style={{ minWidth: 0 }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10, flexWrap: 'wrap', gap: 8 }}>
-                  <div style={{ fontSize: FONT.xl, fontWeight: 700 }}>Kartenboxen</div>
-                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                    <button onClick={() => startStudy(null, null, false)} disabled={cards.length === 0}
-                      style={{ ...btnSecondary(T, 'sm'), opacity: cards.length === 0 ? 0.5 : 1 }}>
-                      <Repeat size={14} style={{ marginRight: 6 }} /> Alle wiederholen
-                    </button>
-                    <button onClick={() => startStudy(null, null)} disabled={dueCards.length === 0}
-                      style={{ ...btnPrimary(T, 'sm'), opacity: dueCards.length === 0 ? 0.5 : 1 }}>
-                      Alle fälligen lernen
-                    </button>
-                  </div>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14, fontSize: FONT.sm, color: T.inkSoft, flexWrap: 'wrap' }}>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                    Neue Karten/Tag:
+                <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: SPACE.md, gap: SPACE.sm }}>
+                  <div style={{ fontSize: FONT.xl, fontWeight: 700, letterSpacing: '-.01em' }}>Kartenboxen</div>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: FONT.sm, color: T.inkSoft }}>
+                    Neu/Tag:
                     <input
                       type="number" min={0} value={newCardsPerDay}
                       onChange={e => setNewCardsPerDay(Math.max(0, Number(e.target.value) || 0))}
-                      style={{ width: 56, padding: '4px 6px', borderRadius: RADIUS.sm, border: `1px solid ${T.border}`, background: T.bgElev, color: T.ink, fontSize: FONT.sm }}
+                      style={{ width: 52, padding: '5px 8px', borderRadius: RADIUS.sm, border: `1px solid ${T.border}`, background: T.bgElev, color: T.ink, fontSize: FONT.sm, textAlign: 'center' }}
                     />
+                    <span style={{ whiteSpace: 'nowrap' }}>· {newIntroducedToday} heute</span>
                   </label>
-                  <span>·</span>
-                  <span>heute {newIntroducedToday} eingeführt</span>
                 </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: SPACE.sm }}>
                   {decks.map(d => {
                     const color = d.type === 'gap' ? T.gold : T.accent;
                     const soft = d.type === 'gap' ? T.goldSoft : T.accentSoft;
                     const progress = d.total > 0 ? Math.round((d.learned / d.total) * 100) : 0;
                     return (
-                      <div key={d.key} className="deck-row" style={{ background: T.bgElev, border: `1px solid ${T.border}`, borderRadius: RADIUS.lg, padding: '14px 16px', boxShadow: T.shadow, transition: 'border-color .15s' }}>
-                        <div className="deck-head" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                          <div style={{ width: 36, height: 36, borderRadius: RADIUS.md, background: soft, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                            {d.type === 'gap' ? <PenLine size={17} color={color} /> : <BookOpen size={17} color={color} />}
+                      <div key={d.key} className="row-link" style={{ ...surface(T), padding: SPACE.lg }}>
+                        <div className="deck-head" style={{ display: 'flex', alignItems: 'center', gap: SPACE.md, marginBottom: SPACE.md }}>
+                          <div style={{ width: 40, height: 40, borderRadius: RADIUS.md, background: soft, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                            {d.type === 'gap' ? <PenLine size={18} color={color} /> : <BookOpen size={18} color={color} />}
                           </div>
                           <div style={{ flex: 1, minWidth: 0 }}>
-                            <div style={{ fontWeight: 600, fontSize: FONT.md, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.label}</div>
-                            <div className="mono" style={{ fontSize: FONT.xs, color: T.inkSoft, marginTop: 2, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                              <span style={{ color: d.due > 0 ? color : T.inkSoft, fontWeight: d.due > 0 ? 600 : 400 }}>{d.due} fällig</span>
-                              <span>·</span><span>{d.neu} neu</span>
-                              <span>·</span><span>{d.learned}/{d.total} gelernt</span>
+                            <div style={{ fontWeight: 600, fontSize: FONT.lg, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', letterSpacing: '-.01em' }}>{d.label}</div>
+                            <div className="mono" style={{ fontSize: FONT.xs, color: T.inkSoft, marginTop: 3 }}>
+                              {d.learned}/{d.total} gelernt · {d.neu} neu
                             </div>
                           </div>
                           <div className="deck-actions">
-                            <button onClick={() => startStudy(d.key, d.label)} disabled={d.due === 0}
-                              style={{ ...btnSecondary(T, 'sm'), opacity: d.due === 0 ? 0.4 : 1 }}>
-                              Lernen <ChevronRight size={13} style={{ marginLeft: 2 }} />
-                            </button>
-                            <button onClick={() => startStudy(d.key, d.label, false)} style={btnGhost(T, 'sm')}>
-                              <Repeat size={11} /> alle wiederholen
+                            {d.due > 0 && (
+                              <span className="mono" style={{
+                                background: soft, color, padding: '4px 10px', borderRadius: RADIUS.pill,
+                                fontSize: FONT.sm, fontWeight: 600, whiteSpace: 'nowrap',
+                              }}>
+                                {d.due} fällig
+                              </span>
+                            )}
+                            <button className="press" onClick={() => startStudy(d.key, d.label)} disabled={d.due === 0}
+                              style={{ ...btnSecondary(T, 'sm'), opacity: d.due === 0 ? .4 : 1 }}>
+                              Lernen <ChevronRight size={14} />
                             </button>
                           </div>
                         </div>
-                        <div style={{ height: 5, borderRadius: RADIUS.sm, background: soft, marginTop: 12, overflow: 'hidden' }}>
-                          <div style={{ height: '100%', width: `${progress}%`, borderRadius: RADIUS.sm, background: color, transition: 'width .3s' }} />
+                        <div style={{ height: 6, borderRadius: RADIUS.pill, background: soft, overflow: 'hidden' }}>
+                          <div style={{ height: '100%', width: `${progress}%`, borderRadius: RADIUS.pill, background: color, transition: 'width .4s ease' }} />
                         </div>
                       </div>
                     );
                   })}
                   {decks.length === 0 && (
-                    <div style={{ background: T.bgElev, border: `1px dashed ${T.border}`, borderRadius: RADIUS.lg, padding: '28px 16px', textAlign: 'center', color: T.inkSoft, fontSize: FONT.base }}>
-                      Noch keine Kartenboxen. Unter „Hinzufügen“ Vokabeln oder Lückensätze anlegen.
+                    <div style={{ ...surface(T), border: `1px dashed ${T.border}`, padding: `${SPACE.xxl}px ${SPACE.lg}px`, textAlign: 'center' }}>
+                      <BookOpen size={30} color={T.inkSoft} style={{ marginBottom: SPACE.md, opacity: .6 }} />
+                      <div style={{ fontWeight: 600, marginBottom: 6, fontSize: FONT.lg }}>Noch keine Karten</div>
+                      <div style={{ color: T.inkSoft, fontSize: FONT.md, marginBottom: SPACE.lg, lineHeight: 1.6 }}>
+                        Leg deine ersten Vokabeln an – eine Zeile pro Wort.
+                      </div>
+                      <button className="press" onClick={() => setView('add')} style={btnPrimary(T)}>
+                        <Plus size={16} /> Vokabeln anlegen
+                      </button>
                     </div>
                   )}
                 </div>
 
                 {difficultCards.length > 0 && (
-                  <div style={{ background: T.bgElev, border: `1px solid ${T.border}`, borderRadius: RADIUS.lg, padding: '14px 16px', marginTop: 16, boxShadow: T.shadow }}>
-                    <div style={{ fontSize: FONT.sm, color: T.inkSoft, marginBottom: 8 }}>Fehlerkartei</div>
-                    {difficultCards.map(c => (
-                      <div key={c.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderTop: `1px solid ${T.border}`, gap: 10 }}>
-                        <span style={{ fontSize: FONT.base, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  <div style={{ ...surface(T), padding: SPACE.lg, marginTop: SPACE.lg }}>
+                    <div style={{ fontSize: FONT.sm, color: T.inkSoft, marginBottom: SPACE.md, fontWeight: 500 }}>Fehlerkartei</div>
+                    {difficultCards.map((c, i) => (
+                      <div key={c.id} style={{ display: 'flex', justifyContent: 'space-between', padding: `${SPACE.sm}px 0`, borderTop: i > 0 ? `1px solid ${T.border}` : 'none', gap: SPACE.md }}>
+                        <span style={{ fontSize: FONT.md, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                           {c.type === 'gap' ? revealSentence(c.sentence) : `${c.front} → ${c.back}`}
                         </span>
-                        <span className="mono" style={{ color: T.danger, fontSize: FONT.sm, flexShrink: 0 }}>{c.wrong} Fehler</span>
+                        <span className="mono" style={{ color: T.danger, fontSize: FONT.sm, flexShrink: 0 }}>{c.wrong}×</span>
                       </div>
                     ))}
                   </div>
                 )}
               </div>
 
-              {/* Stempel-Heatmap */}
+              {/* Aktivität */}
               <div style={{ minWidth: 0 }}>
-                <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 10, gap: 8 }}>
-                  <div style={{ fontSize: FONT.xl, fontWeight: 700 }}>Lern-Stempel</div>
-                  <div className="mono" style={{ fontSize: FONT.xs, color: T.inkSoft }}>12 Wochen</div>
-                </div>
-                <div style={{ background: T.bgElev, border: `1px solid ${T.border}`, borderRadius: RADIUS.lg, padding: '20px 18px', boxShadow: T.shadow }}>
-                  <div className="mono" style={{ fontSize: 24, fontWeight: 600, color: T.accent, marginBottom: 2 }}>
-                    {heatmap.weeks.flat().reduce((s, d) => s + d.count, 0)}
+                <div style={{ fontSize: FONT.xl, fontWeight: 700, marginBottom: SPACE.md, letterSpacing: '-.01em' }}>Aktivität</div>
+                <div style={{ ...surface(T), padding: SPACE.lg }}>
+                  <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, marginBottom: 2 }}>
+                    <span className="mono" style={{ fontSize: FONT.xxl, fontWeight: 600, color: T.accent }}>
+                      {heatmap.weeks.flat().reduce((s, d) => s + d.count, 0)}
+                    </span>
+                    <span style={{ fontSize: FONT.sm, color: T.inkSoft }}>Wiederholungen</span>
                   </div>
-                  <div style={{ fontSize: FONT.xs, color: T.inkSoft, marginBottom: 16 }}>Wiederholungen in den letzten 12 Wochen</div>
+                  <div style={{ fontSize: FONT.xs, color: T.inkSoft, marginBottom: SPACE.lg }}>in den letzten 12 Wochen</div>
 
-                  <div style={{ overflowX: 'auto' }}>
-                    <div style={{ display: 'flex', gap: 4, width: 'max-content' }}>
+                  <div style={{ overflowX: 'auto', paddingBottom: 2 }}>
+                    <div style={{ display: 'flex', gap: 3, width: 'max-content' }}>
                       {heatmap.weeks.map((week, wi) => (
-                        <div key={wi} style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                        <div key={wi} style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
                           {week.map(d => {
                             const level = d.count === 0 ? 0 : Math.min(4, Math.ceil((d.count / heatmap.max) * 4));
-                            const bg = level === 0 ? T.heatEmpty : hexToRgba(T.accent, 0.2 + 0.2 * level);
+                            const bg = level === 0 ? T.heatEmpty : hexToRgba(T.accent, 0.22 + 0.195 * level);
                             return <div key={d.date} className="stamp" title={`${d.date}: ${d.count} Wiederholungen`}
-                              style={{ width: 13, height: 13, borderRadius: 4, background: bg, border: level > 0 ? `1px solid ${hexToRgba(T.accent, 0.25)}` : 'none', transition: 'outline-color .15s' }} />;
+                              style={{ width: 12, height: 12, borderRadius: 3, background: bg, transition: 'outline-color .15s' }} />;
                           })}
                         </div>
                       ))}
                     </div>
                   </div>
 
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 16 }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: FONT.xs, color: T.inkSoft }}>
-                      <span>vor 12 Wochen</span>
-                      <span>heute</span>
-                    </div>
-                    <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>
-                      <span style={{ fontSize: FONT.xs, color: T.inkSoft, marginRight: 2 }}>weniger</span>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: SPACE.md, fontSize: FONT.xs, color: T.inkSoft }}>
+                    <span>12 Wochen</span>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+                      weniger
                       {[0, 1, 2, 3, 4].map(level => (
-                        <div key={level} style={{ width: 11, height: 11, borderRadius: 3, flexShrink: 0, background: level === 0 ? T.heatEmpty : hexToRgba(T.accent, 0.2 + 0.2 * level) }} />
+                        <span key={level} style={{ width: 10, height: 10, borderRadius: 2, background: level === 0 ? T.heatEmpty : hexToRgba(T.accent, 0.22 + 0.195 * level) }} />
                       ))}
-                      <span style={{ fontSize: FONT.xs, color: T.inkSoft, marginLeft: 2 }}>mehr</span>
-                    </div>
+                      mehr
+                    </span>
                   </div>
                 </div>
               </div>
@@ -605,14 +882,16 @@ export default function VokabelTrainer() {
         {/* ---------- ADD ---------- */}
         {view === 'add' && (
           <div>
-            <div style={{ display: 'flex', gap: 6, marginBottom: 20 }}>
-              {[['vocab', 'Vokabeln', BookOpen], ['gap', 'Sätze & Konjugationen', PenLine]].map(([key, label, Icon]) => (
-                <button key={key} onClick={() => setAddTab(key)}
+            <div style={{ fontSize: FONT.xxl, fontWeight: 700, marginBottom: SPACE.lg, letterSpacing: '-.02em' }}>Hinzufügen</div>
+
+            <div style={{ display: 'inline-flex', gap: 3, marginBottom: SPACE.xl, padding: 3, background: T.bgElev, border: `1px solid ${T.border}`, borderRadius: RADIUS.pill }}>
+              {[['vocab', 'Vokabeln', BookOpen], ['gap', 'Sätze', PenLine]].map(([key, label, Icon]) => (
+                <button key={key} className="press" onClick={() => setAddTab(key)}
                   style={{
-                    display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px',
-                    border: 'none', borderRadius: RADIUS.sm,
-                    background: addTab === key ? T.accentSoft : 'transparent', cursor: 'pointer', fontSize: FONT.base, fontWeight: 500,
-                    color: addTab === key ? T.accent : T.inkSoft,
+                    display: 'flex', alignItems: 'center', gap: 6, padding: '9px 18px',
+                    border: 'none', borderRadius: RADIUS.pill, cursor: 'pointer', fontSize: FONT.md, fontWeight: 500,
+                    background: addTab === key ? T.accent : 'transparent',
+                    color: addTab === key ? T.accentInk : T.inkSoft, transition: 'background .15s, color .15s',
                   }}>
                   <Icon size={15} /> {label}
                 </button>
@@ -620,140 +899,56 @@ export default function VokabelTrainer() {
             </div>
 
             {addTab === 'vocab' && (
-              <div>
-                <div style={{ fontSize: FONT.xl, fontWeight: 700, marginBottom: 14 }}>Vokabeln hinzufügen</div>
-                <div style={{ marginBottom: 12 }}>
-                  <label style={{ fontSize: FONT.sm, color: T.inkSoft, display: 'block', marginBottom: 6 }}>Sprachpaar</label>
-                  <select value={pairIdx} onChange={e => setPairIdx(Number(e.target.value))}
-                    style={{ padding: '10px 12px', borderRadius: RADIUS.md, border: `1px solid ${T.border}`, background: T.bgElev, color: T.ink, width: '100%', maxWidth: 320 }}>
-                    {VOCAB_PAIRS.map((p, i) => <option key={p.label} value={i}>{p.label}</option>)}
-                  </select>
-                </div>
+              <div style={{ ...surface(T), padding: SPACE.xl, maxWidth: 620 }}>
+                <label style={{ fontSize: FONT.sm, color: T.inkSoft, display: 'block', marginBottom: SPACE.sm, fontWeight: 500 }}>Sprachpaar</label>
+                <select value={pairIdx} onChange={e => setPairIdx(Number(e.target.value))}
+                  style={{ ...inputStyle, maxWidth: 320, marginBottom: SPACE.lg, cursor: 'pointer' }}>
+                  {VOCAB_PAIRS.map((p, i) => <option key={p.label} value={i}>{p.label}</option>)}
+                </select>
+
+                <label style={{ fontSize: FONT.sm, color: T.inkSoft, display: 'block', marginBottom: SPACE.sm, fontWeight: 500 }}>Vokabeln</label>
                 <textarea value={addText} onChange={e => setAddText(e.target.value)}
-                  placeholder={'Ein Wort pro Zeile, z. B.:\ncasa = Haus\nperro = Hund\ncomer = essen'}
-                  rows={9}
-                  style={{ width: '100%', padding: 14, borderRadius: RADIUS.lg, border: `1px solid ${T.border}`, background: T.bgElev, color: T.ink, fontSize: FONT.md, resize: 'vertical' }} />
-                <div style={{ display: 'flex', gap: 10, marginTop: 12, flexWrap: 'wrap', alignItems: 'center' }}>
-                  <button onClick={handleAddVocab} style={btnPrimary(T)}>Hinzufügen</button>
-                  <button onClick={() => vocabFileRef.current.click()} style={btnSecondary(T)}>
-                    <Upload size={14} style={{ marginRight: 6 }} /> Datei hochladen
+                  placeholder={'casa = Haus\nperro = Hund\ncomer = essen'}
+                  rows={8}
+                  style={{ ...inputStyle, resize: 'vertical', lineHeight: 1.7, fontFamily: "'IBM Plex Mono', monospace", fontSize: FONT.base }} />
+
+                <div style={{ display: 'flex', gap: SPACE.sm, marginTop: SPACE.lg, flexWrap: 'wrap' }}>
+                  <button className="press" onClick={handleAddVocab} style={btnPrimary(T)}><Plus size={16} /> Hinzufügen</button>
+                  <button className="press" onClick={() => vocabFileRef.current.click()} style={btnSecondary(T)}>
+                    <Upload size={15} /> Datei
                   </button>
                   <input ref={vocabFileRef} type="file" accept=".txt,.csv" style={{ display: 'none' }} onChange={e => readFileInto(e, setAddText)} />
                 </div>
-                <div style={{ marginTop: 14, fontSize: FONT.sm, color: T.inkSoft }}>
-                  Format: <span className="mono">Vorderseite = Rückseite</span> (auch Komma oder Semikolon als Trenner möglich), eine Zeile pro Karte. Eine .txt- oder .csv-Datei wird direkt in das Feld geladen, sodass du sie vor dem Import noch prüfen kannst.
+                <div style={{ marginTop: SPACE.lg, fontSize: FONT.sm, color: T.inkSoft, lineHeight: 1.6 }}>
+                  Eine Zeile pro Karte im Format <span className="mono">Wort = Übersetzung</span> (auch Komma oder Semikolon gehen). Eine hochgeladene .txt/.csv landet erst im Feld – du kannst sie also vorher prüfen.
                 </div>
               </div>
             )}
 
             {addTab === 'gap' && (
-              <div>
-                <div style={{ fontSize: FONT.xl, fontWeight: 700, marginBottom: 14 }}>Sätze & Konjugationen hinzufügen</div>
-                <div style={{ marginBottom: 12 }}>
-                  <label style={{ fontSize: FONT.sm, color: T.inkSoft, display: 'block', marginBottom: 6 }}>Sprache</label>
-                  <select value={sentenceLangIdx} onChange={e => setSentenceLangIdx(Number(e.target.value))}
-                    style={{ padding: '10px 12px', borderRadius: RADIUS.md, border: `1px solid ${T.border}`, background: T.bgElev, color: T.ink, width: '100%', maxWidth: 320 }}>
-                    {SENTENCE_LANGS.map(l => <option key={l} value={SENTENCE_LANGS.indexOf(l)}>{l}</option>)}
-                  </select>
-                </div>
+              <div style={{ ...surface(T), padding: SPACE.xl, maxWidth: 620 }}>
+                <label style={{ fontSize: FONT.sm, color: T.inkSoft, display: 'block', marginBottom: SPACE.sm, fontWeight: 500 }}>Sprache</label>
+                <select value={sentenceLangIdx} onChange={e => setSentenceLangIdx(Number(e.target.value))}
+                  style={{ ...inputStyle, maxWidth: 320, marginBottom: SPACE.lg, cursor: 'pointer' }}>
+                  {SENTENCE_LANGS.map(l => <option key={l} value={SENTENCE_LANGS.indexOf(l)}>{l}</option>)}
+                </select>
+
+                <label style={{ fontSize: FONT.sm, color: T.inkSoft, display: 'block', marginBottom: SPACE.sm, fontWeight: 500 }}>Sätze</label>
                 <textarea value={sentenceText} onChange={e => setSentenceText(e.target.value)}
-                  placeholder={'Ein Satz pro Zeile, die zu lernende Form in eckigen Klammern:\nYo [como] fruta todos los días.\nElla [tiene] veinte años.\nNosotros [vivimos] en Berlín.'}
-                  rows={9}
-                  style={{ width: '100%', padding: 14, borderRadius: RADIUS.lg, border: `1px solid ${T.border}`, background: T.bgElev, color: T.ink, fontSize: FONT.md, resize: 'vertical' }} />
-                <div style={{ display: 'flex', gap: 10, marginTop: 12, flexWrap: 'wrap', alignItems: 'center' }}>
-                  <button onClick={handleAddSentences} style={btnPrimary(T)}>Hinzufügen</button>
-                  <button onClick={() => sentenceFileRef.current.click()} style={btnSecondary(T)}>
-                    <Upload size={14} style={{ marginRight: 6 }} /> Datei hochladen
+                  placeholder={'Yo [como] fruta todos los días.\nElla [tiene] veinte años.\nNosotros [vivimos] en Berlín.'}
+                  rows={8}
+                  style={{ ...inputStyle, resize: 'vertical', lineHeight: 1.7, fontFamily: "'IBM Plex Mono', monospace", fontSize: FONT.base }} />
+
+                <div style={{ display: 'flex', gap: SPACE.sm, marginTop: SPACE.lg, flexWrap: 'wrap' }}>
+                  <button className="press" onClick={handleAddSentences} style={btnPrimary(T)}><Plus size={16} /> Hinzufügen</button>
+                  <button className="press" onClick={() => sentenceFileRef.current.click()} style={btnSecondary(T)}>
+                    <Upload size={15} /> Datei
                   </button>
                   <input ref={sentenceFileRef} type="file" accept=".txt,.csv" style={{ display: 'none' }} onChange={e => readFileInto(e, setSentenceText)} />
                 </div>
-                <div style={{ marginTop: 14, fontSize: FONT.sm, color: T.inkSoft }}>
-                  Beim Lernen wird die Klammer durch eine Lücke ersetzt (z. B. „Yo ▁▁▁ fruta…“); du tippst die fehlende Form, kleine Tippfehler werden toleriert. Aktuell wird pro Zeile eine Lücke unterstützt.
+                <div style={{ marginTop: SPACE.lg, fontSize: FONT.sm, color: T.inkSoft, lineHeight: 1.6 }}>
+                  Die zu übende Form in <span className="mono">[eckige Klammern]</span> setzen – beim Lernen wird daraus eine Lücke. Kleine Tippfehler werden toleriert. Aktuell eine Lücke pro Zeile.
                 </div>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* ---------- STUDY ---------- */}
-        {view === 'study' && (
-          <div>
-            {!current ? (
-              <div style={{ textAlign: 'center', padding: '80px 20px' }}>
-                <CheckCircle2 size={38} color={T.success} style={{ marginBottom: 12 }} />
-                <div style={{ fontSize: FONT.xl, fontWeight: 700, marginBottom: 6 }}>Session abgeschlossen</div>
-                <div style={{ color: T.inkSoft, marginBottom: 20 }}>Alle fälligen Karten{deckLabel ? ` in „${deckLabel}“` : ''} für heute erledigt.</div>
-                <button onClick={() => setView('dashboard')} style={btnPrimary(T)}>Zurück zum Dashboard</button>
-              </div>
-            ) : (
-              <div style={{ maxWidth: 540, margin: '0 auto' }}>
-                <div style={{ height: 4, borderRadius: RADIUS.sm, background: T.border, marginBottom: 10, overflow: 'hidden' }}>
-                  <div style={{ height: '100%', width: `${sessionProgress}%`, background: T.accent, borderRadius: RADIUS.sm, transition: 'width .25s' }} />
-                </div>
-                <div className="mono" style={{ fontSize: FONT.sm, color: T.inkSoft, marginBottom: 14, textAlign: 'center' }}>
-                  Noch {queue.length} Karte{queue.length !== 1 ? 'n' : ''} {deckLabel ? `· ${deckLabel}` : ''}
-                </div>
-                {current.type === 'vocab' && (
-                  <div style={{ textAlign: 'center', marginBottom: 8 }}>
-                    <button onClick={() => setFlipped(f => !f)} style={btnSecondary(T, 'sm')}>
-                      <Repeat size={13} style={{ marginRight: 6 }} /> Umdrehen
-                    </button>
-                  </div>
-                )}
-                <div style={{ background: T.bgElev, border: `1px solid ${T.border}`, borderRadius: RADIUS.lg, padding: '44px 28px', textAlign: 'center', minHeight: 170, display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 14, boxShadow: T.shadow }}>
-                  <div style={{ fontSize: current.type === 'gap' ? 19 : 23, fontWeight: 600, lineHeight: 1.4 }}>{displayFront}</div>
-                  {(!isWriteInteraction || revealed) && (
-                    <button onClick={() => speak(current.type === 'gap' ? revealSentence(current.sentence) : displayFront)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: T.inkSoft, alignSelf: 'center' }}><Volume2 size={16} /></button>
-                  )}
-
-                  {!isWriteInteraction && revealed && (
-                    <div style={{ borderTop: `1px solid ${T.border}`, paddingTop: 14, fontSize: FONT.xxl, color: T.accent, fontWeight: 600 }}>{displayBack}</div>
-                  )}
-                  {isWriteInteraction && (
-                    <div style={{ marginTop: 8 }}>
-                      {!revealed ? (
-                        <div style={{ display: 'flex', gap: 8, justifyContent: 'center', flexWrap: 'wrap' }}>
-                          <input autoFocus value={writeInput} onChange={e => setWriteInput(e.target.value)}
-                            onKeyDown={e => e.key === 'Enter' && checkWrite()}
-                            placeholder={current.type === 'gap' ? 'fehlende Form eingeben…' : 'Übersetzung eingeben...'}
-                            style={{ padding: '10px 14px', borderRadius: RADIUS.md, border: `1px solid ${T.border}`, background: T.bg, color: T.ink, fontSize: FONT.lg, width: '70%', minWidth: 180 }} />
-                          <button onClick={checkWrite} style={btnPrimary(T)}>Prüfen</button>
-                        </div>
-                      ) : (
-                        <div>
-                          <div style={{ color: writeResult?.ok ? T.success : T.danger, display: 'flex', alignItems: 'center', gap: 6, justifyContent: 'center', fontWeight: 600 }}>
-                            {writeResult?.ok ? <CheckCircle2 size={18} /> : <XCircle size={18} />}
-                            {writeResult?.ok ? 'Richtig' : 'Nicht ganz'}
-                          </div>
-                          <div style={{ fontSize: FONT.xxl, marginTop: 8, fontWeight: 600 }}>
-                            {current.type === 'gap' ? revealSentence(current.sentence) : displayBack}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-
-                {!isWriteInteraction && !revealed && (
-                  <div style={{ textAlign: 'center', marginTop: 20 }}>
-                    <button onClick={() => setRevealed(true)} style={btnPrimary(T)}>Aufdecken (Leertaste)</button>
-                  </div>
-                )}
-                {current.type === 'vocab' && (
-                  <div style={{ textAlign: 'center', marginTop: 12 }}>
-                    <button onClick={() => setStudyMode(m => m === 'classic' ? 'write' : 'classic')} style={{ ...btnGhost(T, 'sm'), textDecoration: 'underline' }}>
-                      Modus: {studyMode === 'classic' ? 'Aufdecken' : 'Tippen'} (wechseln)
-                    </button>
-                  </div>
-                )}
-                {revealed && (
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 8, marginTop: 20 }}>
-                    <button onClick={() => submitRating('again')} style={ratingBtn(T.danger, T.dangerSoft)}>Nochmal<span>1</span></button>
-                    <button onClick={() => submitRating('hard')} style={ratingBtn(T.gold, T.goldSoft)}>Schwer<span>2</span></button>
-                    <button onClick={() => submitRating('good')} style={ratingBtn(T.success, T.successSoft)}>Gut<span>3</span></button>
-                    <button onClick={() => submitRating('easy')} style={ratingBtn(T.accent, T.accentSoft)}>Einfach<span>4</span></button>
-                  </div>
-                )}
               </div>
             )}
           </div>
@@ -762,14 +957,16 @@ export default function VokabelTrainer() {
         {/* ---------- BROWSE ---------- */}
         {view === 'browse' && (
           <div>
-            <div style={{ display: 'flex', gap: 10, marginBottom: 16, flexWrap: 'wrap' }}>
-              <div style={{ position: 'relative', flex: 1, minWidth: 200 }}>
-                <Search size={15} style={{ position: 'absolute', left: 12, top: 12, color: T.inkSoft }} />
-                <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Suche nach Wort, Übersetzung, Satz..."
-                  style={{ width: '100%', padding: '10px 12px 10px 34px', borderRadius: RADIUS.md, border: `1px solid ${T.border}`, background: T.bgElev, color: T.ink }} />
+            <div style={{ fontSize: FONT.xxl, fontWeight: 700, marginBottom: SPACE.lg, letterSpacing: '-.02em' }}>Karten</div>
+
+            <div style={{ display: 'flex', gap: SPACE.sm, marginBottom: SPACE.lg, flexWrap: 'wrap' }}>
+              <div style={{ position: 'relative', flex: 1, minWidth: 220 }}>
+                <Search size={16} style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', color: T.inkSoft, pointerEvents: 'none' }} />
+                <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Suchen…"
+                  style={{ ...inputStyle, paddingLeft: 40 }} />
               </div>
               <select value={filter} onChange={e => setFilter(e.target.value)}
-                style={{ padding: '10px 12px', borderRadius: RADIUS.md, border: `1px solid ${T.border}`, background: T.bgElev, color: T.ink }}>
+                style={{ ...inputStyle, width: 'auto', cursor: 'pointer' }}>
                 <option value="all">Alle</option>
                 <option value="vocab">Nur Vokabeln</option>
                 <option value="gap">Nur Sätze</option>
@@ -777,59 +974,99 @@ export default function VokabelTrainer() {
                 <option value="due">Heute fällig</option>
                 <option value="difficult">Schwierig</option>
               </select>
-              <button onClick={exportJSON} style={btnSecondary(T)}><Download size={14} style={{ marginRight: 6 }} />Export</button>
-              <button onClick={() => importFileRef.current.click()} style={btnSecondary(T)}><Upload size={14} style={{ marginRight: 6 }} />Import per Datei</button>
+              <button className="press" onClick={exportJSON} style={btnSecondary(T)}><Download size={15} /> Export</button>
+              <button className="press" onClick={() => importFileRef.current.click()} style={btnSecondary(T)}><Upload size={15} /> Import</button>
               <input ref={importFileRef} type="file" accept=".json" style={{ display: 'none' }} onChange={importJSON} />
             </div>
 
             {exportText !== null && (
-              <div style={{ background: T.bgElev, border: `1px solid ${T.border}`, borderRadius: RADIUS.lg, padding: 14, marginBottom: 16, boxShadow: T.shadow }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                  <div style={{ fontSize: FONT.base, fontWeight: 600 }}>Sicherung – Text kopieren und lokal ablegen</div>
-                  <button onClick={() => setExportText(null)} style={btnGhost(T, 'sm')}>Schließen</button>
+              <div className="rise-in" style={{ ...surface(T), padding: SPACE.lg, marginBottom: SPACE.lg }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: SPACE.md }}>
+                  <div style={{ fontSize: FONT.md, fontWeight: 600 }}>Sicherung</div>
+                  <button className="press" onClick={() => setExportText(null)} style={btnGhost(T)}>Schließen</button>
                 </div>
-                <textarea ref={exportTextareaRef} readOnly value={exportText} rows={6}
+                <textarea ref={exportTextareaRef} readOnly value={exportText} rows={5}
                   onFocus={e => e.target.select()}
-                  style={{ width: '100%', padding: 10, borderRadius: RADIUS.md, border: `1px solid ${T.border}`, background: T.bg, color: T.ink, fontSize: FONT.xs, fontFamily: "'IBM Plex Mono', monospace" }} />
-                <div style={{ display: 'flex', gap: 10, marginTop: 10, alignItems: 'center', flexWrap: 'wrap' }}>
-                  <button onClick={copyExportText} style={btnPrimary(T)}>In Zwischenablage kopieren</button>
-                  <span style={{ fontSize: FONT.xs, color: T.inkSoft }}>Tipp: kopierten Text z. B. in eine Notiz-App einfügen und dort als Sicherung aufbewahren.</span>
+                  style={{ ...inputStyle, background: T.bg, fontSize: FONT.xs, fontFamily: "'IBM Plex Mono', monospace", resize: 'vertical' }} />
+                <div style={{ display: 'flex', gap: SPACE.md, marginTop: SPACE.md, alignItems: 'center', flexWrap: 'wrap' }}>
+                  <button className="press" onClick={copyExportText} style={btnPrimary(T)}>Kopieren</button>
+                  <span style={{ fontSize: FONT.sm, color: T.inkSoft }}>z. B. in eine Notiz-App einfügen und aufbewahren.</span>
                 </div>
               </div>
             )}
 
-            <div style={{ background: T.bgElev, border: `1px dashed ${T.border}`, borderRadius: RADIUS.lg, padding: 14, marginBottom: 16 }}>
-              <div style={{ fontSize: FONT.base, fontWeight: 600, marginBottom: 8 }}>Oder: gesicherten Text wieder einfügen</div>
-              <textarea value={importPasteText} onChange={e => setImportPasteText(e.target.value)} rows={4}
-                placeholder="Zuvor kopierten Sicherungstext hier einfügen…"
-                style={{ width: '100%', padding: 10, borderRadius: RADIUS.md, border: `1px solid ${T.border}`, background: T.bg, color: T.ink, fontSize: FONT.xs, fontFamily: "'IBM Plex Mono', monospace" }} />
-              <button onClick={importFromPaste} style={{ ...btnSecondary(T), marginTop: 8 }} disabled={!importPasteText.trim()}>Einfügen & importieren</button>
+            <div style={{ ...surface(T), border: `1px dashed ${T.border}`, padding: SPACE.lg, marginBottom: SPACE.lg }}>
+              <div style={{ fontSize: FONT.md, fontWeight: 600, marginBottom: SPACE.md }}>Sicherung einspielen</div>
+              <textarea value={importPasteText} onChange={e => setImportPasteText(e.target.value)} rows={3}
+                placeholder="Gesicherten Text hier einfügen…"
+                style={{ ...inputStyle, background: T.bg, fontSize: FONT.xs, fontFamily: "'IBM Plex Mono', monospace", resize: 'vertical' }} />
+              <button className="press" onClick={importFromPaste} style={{ ...btnSecondary(T), marginTop: SPACE.md, opacity: importPasteText.trim() ? 1 : .5 }} disabled={!importPasteText.trim()}>
+                Einfügen & importieren
+              </button>
             </div>
-            <div style={{ fontSize: FONT.sm, color: T.inkSoft, marginBottom: 10 }}>{filtered.length} Karte(n)</div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+
+            <div style={{ fontSize: FONT.sm, color: T.inkSoft, marginBottom: SPACE.md }}>{filtered.length} Karte(n)</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
               {filtered.map(c => (
-                <div key={c.id} style={{ background: T.bgElev, border: `1px solid ${T.border}`, borderRadius: RADIUS.lg, padding: '12px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10 }}>
+                <div key={c.id} className="row-link" style={{ ...surface(T), padding: `${SPACE.md}px ${SPACE.lg}px`, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: SPACE.md }}>
                   <div style={{ minWidth: 0 }}>
                     {c.type === 'gap' ? (
-                      <div style={{ fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{revealSentence(c.sentence)}</div>
+                      <div style={{ fontWeight: 600, fontSize: FONT.md, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{revealSentence(c.sentence)}</div>
                     ) : (
-                      <div style={{ fontWeight: 600 }}>{c.front} <span style={{ color: T.inkSoft, fontWeight: 400 }}>→</span> {c.back}</div>
+                      <div style={{ fontWeight: 600, fontSize: FONT.md }}>{c.front} <span style={{ color: T.inkSoft, fontWeight: 400 }}>→</span> {c.back}</div>
                     )}
-                    <div className="mono" style={{ fontSize: FONT.xs, color: T.inkSoft, marginTop: 2 }}>
-                      {c.type === 'gap' ? `Sätze · ${c.language}` : `${c.langA} → ${c.langB}`} · fällig {c.dueDate} · {c.totalReviews || 0}× wiederholt
+                    <div className="mono" style={{ fontSize: FONT.xs, color: T.inkSoft, marginTop: 3 }}>
+                      {c.type === 'gap' ? `Satz · ${c.language}` : `${c.langA} → ${c.langB}`} · fällig {c.dueDate} · {c.totalReviews || 0}×
                     </div>
                   </div>
-                  <button onClick={() => deleteCard(c.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: T.danger, flexShrink: 0 }}><Trash2 size={16} /></button>
+                  <button className="press" onClick={() => deleteCard(c.id)} aria-label="Karte löschen"
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: T.inkSoft, flexShrink: 0, padding: 6, display: 'flex' }}>
+                    <Trash2 size={16} />
+                  </button>
                 </div>
               ))}
-              {filtered.length === 0 && <div style={{ color: T.inkSoft, textAlign: 'center', padding: 40 }}>Keine Karten gefunden.</div>}
+              {filtered.length === 0 && (
+                <div style={{ ...surface(T), border: `1px dashed ${T.border}`, color: T.inkSoft, textAlign: 'center', padding: SPACE.xxl }}>
+                  Keine Karten gefunden.
+                </div>
+              )}
             </div>
           </div>
         )}
       </div>
 
+      {/* Navigationsleiste unten - am Handy die Hauptnavigation */}
+      <div className="nav-bottom" style={{
+        position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 20,
+        background: hexToRgba(T.bgElev, .95), backdropFilter: 'blur(12px)',
+        borderTop: `1px solid ${T.border}`,
+        paddingBottom: 'env(safe-area-inset-bottom)',
+      }}>
+        <div style={{ display: 'flex', height: NAVBAR_H }}>
+          {navItems.map(([key, label, Icon]) => {
+            const active = view === key;
+            return (
+              <button key={key} onClick={() => setView(key)}
+                style={{
+                  flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                  gap: 3, border: 'none', background: 'none', cursor: 'pointer',
+                  color: active ? T.accent : T.inkSoft, fontSize: FONT.xs, fontWeight: active ? 600 : 500,
+                  transition: 'color .15s',
+                }}>
+                <Icon size={21} strokeWidth={active ? 2.4 : 1.9} />
+                {label}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
       {toast && (
-        <div style={{ position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)', background: T.ink, color: T.bg, padding: '10px 18px', borderRadius: RADIUS.md, fontSize: FONT.md, maxWidth: '90vw', textAlign: 'center', boxShadow: T.shadow }}>
+        <div style={{
+          position: 'fixed', bottom: `calc(${NAVBAR_H + SPACE.lg}px + env(safe-area-inset-bottom))`, left: '50%', transform: 'translateX(-50%)',
+          background: T.ink, color: T.bg, padding: '11px 20px', borderRadius: RADIUS.pill,
+          fontSize: FONT.md, maxWidth: '90vw', textAlign: 'center', boxShadow: T.shadowLift, zIndex: 30,
+        }}>
           {toast}
         </div>
       )}

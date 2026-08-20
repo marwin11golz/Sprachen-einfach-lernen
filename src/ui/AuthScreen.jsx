@@ -3,7 +3,7 @@
 
 import React, { useState } from 'react';
 import { CheckCircle2, RefreshCw, LogOut, CloudOff } from 'lucide-react';
-import { btnPrimary, btnSecondary, btnGhost, SPACE, RADIUS, FONT } from '../lib/theme.js';
+import { btnPrimary, btnSecondary, btnGhost, surface, SPACE, RADIUS, FONT } from '../lib/theme.js';
 
 function fmtTime(iso) {
   if (!iso) return 'noch nie';
@@ -25,13 +25,13 @@ export default function AuthScreen({
   const [notice, setNotice] = useState(null);
 
   const card = {
-    background: T.bgElev, border: `1px solid ${T.border}`, borderRadius: RADIUS.lg,
-    padding: '22px 20px', boxShadow: T.shadow, maxWidth: 420, margin: '0 auto',
+    ...surface(T, { lift: true }),
+    padding: SPACE.xl, maxWidth: 420, margin: '0 auto',
   };
   const input = {
-    width: '100%', padding: '11px 13px', borderRadius: RADIUS.md,
+    width: '100%', padding: '13px 15px', borderRadius: RADIUS.md,
     border: `1px solid ${T.border}`, background: T.bg, color: T.ink,
-    fontSize: FONT.lg, marginBottom: 10,
+    fontSize: FONT.md, marginBottom: SPACE.md, outline: 'none',
   };
 
   if (!auth.cloudConfigured) {
@@ -63,7 +63,7 @@ export default function AuthScreen({
 
         <div style={{
           display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px',
-          borderRadius: RADIUS.md, background: T.accentSoft, color: T.accent,
+          borderRadius: RADIUS.pill, background: T.accentSoft, color: T.accent,
           fontSize: FONT.base, marginBottom: 8,
         }}>
           <CheckCircle2 size={16} />
