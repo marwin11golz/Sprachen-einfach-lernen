@@ -442,7 +442,7 @@ export default function VokabelTrainer() {
   const sessionProgress = sessionTotal > 0 ? Math.max(0, Math.min(100, (sessionDone / sessionTotal) * 100)) : 0;
 
   const inputStyle = {
-    width: '100%', padding: '13px 15px', borderRadius: RADIUS.md,
+    width: '100%', padding: `${SPACE.md}px ${SPACE.lg}px`, borderRadius: RADIUS.md,
     border: `1px solid ${T.border}`, background: T.bgElev, color: T.ink,
     fontSize: FONT.md, outline: 'none',
   };
@@ -559,7 +559,7 @@ export default function VokabelTrainer() {
                   {current.type === 'gap' ? `Satz · ${current.language}` : `${flipped ? current.langB : current.langA} → ${flipped ? current.langA : current.langB}`}
                 </div>
 
-                <div style={{ fontSize: current.type === 'gap' ? 24 : 34, fontWeight: 600, lineHeight: 1.35, letterSpacing: '-.01em' }}>
+                <div style={{ fontSize: current.type === 'gap' ? FONT.xl : FONT.xxl, fontWeight: 600, lineHeight: 1.35, letterSpacing: '-.01em' }}>
                   {displayFront}
                 </div>
 
@@ -574,7 +574,7 @@ export default function VokabelTrainer() {
 
                 {!isWriteInteraction && revealed && (
                   <div className="rise-in" style={{ marginTop: SPACE.xl, paddingTop: SPACE.xl, borderTop: `1px solid ${T.border}` }}>
-                    <div style={{ fontSize: 30, color: T.accent, fontWeight: 600, lineHeight: 1.35 }}>{displayBack}</div>
+                    <div style={{ fontSize: FONT.xl, color: T.accent, fontWeight: 600, lineHeight: 1.35 }}>{displayBack}</div>
                     {/* Beim umgedrehten Lernen steht das Fremdwort hier - ohne
                         eigenen Knopf waere gerade das nicht zu hoeren. */}
                     <button className="press" onClick={() => speak(displayBack, backLang)}
@@ -603,12 +603,12 @@ export default function VokabelTrainer() {
                         <div style={{
                           display: 'inline-flex', alignItems: 'center', gap: SPACE.sm, fontWeight: 600,
                           color: writeResult?.ok ? T.success : T.danger, background: writeResult?.ok ? T.successSoft : T.dangerSoft,
-                          padding: '8px 16px', borderRadius: RADIUS.pill, fontSize: FONT.md,
+                          padding: `${SPACE.sm}px ${SPACE.lg}px`, borderRadius: RADIUS.pill, fontSize: FONT.md,
                         }}>
                           {writeResult?.ok ? <CheckCircle2 size={17} /> : <XCircle size={17} />}
                           {writeResult?.ok ? 'Richtig' : 'Nicht ganz'}
                         </div>
-                        <div style={{ fontSize: 24, marginTop: SPACE.lg, fontWeight: 600, lineHeight: 1.4 }}>
+                        <div style={{ fontSize: FONT.xl, marginTop: SPACE.lg, fontWeight: 600, lineHeight: 1.4 }}>
                           {current.type === 'gap' ? revealSentence(current.sentence) : displayBack}
                         </div>
                         <button className="press"
@@ -675,7 +675,7 @@ export default function VokabelTrainer() {
         {toast && (
           <div style={{
             position: 'fixed', bottom: `calc(120px + env(safe-area-inset-bottom))`, left: '50%', transform: 'translateX(-50%)',
-            background: T.ink, color: T.bg, padding: '11px 20px', borderRadius: RADIUS.pill,
+            background: T.ink, color: T.bg, padding: `${SPACE.md}px ${SPACE.xl}px`, borderRadius: RADIUS.pill,
             fontSize: FONT.md, maxWidth: '90vw', textAlign: 'center', boxShadow: T.shadowLift, zIndex: 50,
           }}>
             {toast}
@@ -720,7 +720,7 @@ export default function VokabelTrainer() {
               {navItems.map(([key, label, Icon]) => (
                 <button key={key} className="press" onClick={() => setView(key)}
                   style={{
-                    display: 'flex', alignItems: 'center', gap: 6, padding: '9px 15px', borderRadius: RADIUS.pill,
+                    display: 'flex', alignItems: 'center', gap: SPACE.xs, padding: `${SPACE.sm}px ${SPACE.md}px`, borderRadius: RADIUS.pill,
                     border: 'none', cursor: 'pointer', fontSize: FONT.md, fontWeight: 500,
                     background: view === key ? T.accentSoft : 'transparent',
                     color: view === key ? T.accent : T.inkSoft, transition: 'background .15s, color .15s',
@@ -819,10 +819,10 @@ export default function VokabelTrainer() {
                   flex: 1, padding: `${SPACE.lg}px ${SPACE.md}px`, textAlign: 'center', minWidth: 0,
                   borderLeft: i > 0 ? `1px solid ${T.border}` : 'none',
                 }}>
-                  <div style={{ fontSize: FONT.xs, color: T.inkSoft, marginBottom: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
+                  <div style={{ fontSize: FONT.xs, color: T.inkSoft, marginBottom: SPACE.sm, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: SPACE.xs }}>
                     {icon}{label}
                   </div>
-                  <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'center', gap: 3 }}>
+                  <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'center', gap: SPACE.xs }}>
                     <span className="mono" style={{ fontSize: FONT.xxl, fontWeight: 600, color }}>{val}</span>
                     <span style={{ fontSize: FONT.sm, color: T.inkSoft }}>{unit}</span>
                   </div>
@@ -834,12 +834,12 @@ export default function VokabelTrainer() {
               <div style={{ minWidth: 0 }}>
                 <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: SPACE.md, gap: SPACE.sm }}>
                   <div style={{ fontSize: FONT.xl, fontWeight: 700, letterSpacing: '-.01em' }}>Kartenboxen</div>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: FONT.sm, color: T.inkSoft }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: SPACE.sm, fontSize: FONT.sm, color: T.inkSoft }}>
                     Neu/Tag:
                     <input
                       type="number" min={0} value={newCardsPerDay}
                       onChange={e => setNewCardsPerDay(Math.max(0, Number(e.target.value) || 0))}
-                      style={{ width: 52, padding: '5px 8px', borderRadius: RADIUS.sm, border: `1px solid ${T.border}`, background: T.bgElev, color: T.ink, fontSize: FONT.sm, textAlign: 'center' }}
+                      style={{ width: 52, padding: `${SPACE.xs}px ${SPACE.sm}px`, borderRadius: RADIUS.sm, border: `1px solid ${T.border}`, background: T.bgElev, color: T.ink, fontSize: FONT.sm, textAlign: 'center' }}
                     />
                     <span style={{ whiteSpace: 'nowrap' }}>· {newIntroducedToday} heute</span>
                   </label>
@@ -865,7 +865,7 @@ export default function VokabelTrainer() {
                           <div className="deck-actions">
                             {d.due > 0 && (
                               <span className="mono" style={{
-                                background: soft, color, padding: '4px 10px', borderRadius: RADIUS.pill,
+                                background: soft, color, padding: `${SPACE.xs}px ${SPACE.md}px`, borderRadius: RADIUS.pill,
                                 fontSize: FONT.sm, fontWeight: 600, whiteSpace: 'nowrap',
                               }}>
                                 {d.due} fällig
@@ -916,7 +916,7 @@ export default function VokabelTrainer() {
               <div style={{ minWidth: 0 }}>
                 <div style={{ fontSize: FONT.xl, fontWeight: 700, marginBottom: SPACE.md, letterSpacing: '-.01em' }}>Aktivität</div>
                 <div style={{ ...surface(T), padding: SPACE.lg }}>
-                  <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, marginBottom: 2 }}>
+                  <div style={{ display: 'flex', alignItems: 'baseline', gap: SPACE.sm, marginBottom: SPACE.xs }}>
                     <span className="mono" style={{ fontSize: FONT.xxl, fontWeight: 600, color: T.accent }}>
                       {heatmap.weeks.flat().reduce((s, d) => s + d.count, 0)}
                     </span>
@@ -964,7 +964,7 @@ export default function VokabelTrainer() {
               {[['vocab', 'Vokabeln', BookOpen], ['gap', 'Sätze', PenLine]].map(([key, label, Icon]) => (
                 <button key={key} className="press" onClick={() => setAddTab(key)}
                   style={{
-                    display: 'flex', alignItems: 'center', gap: 6, padding: '9px 18px',
+                    display: 'flex', alignItems: 'center', gap: SPACE.xs, padding: `${SPACE.sm}px ${SPACE.lg}px`,
                     border: 'none', borderRadius: RADIUS.pill, cursor: 'pointer', fontSize: FONT.md, fontWeight: 500,
                     background: addTab === key ? T.accent : 'transparent',
                     color: addTab === key ? T.accentInk : T.inkSoft, transition: 'background .15s, color .15s',
@@ -1082,7 +1082,7 @@ export default function VokabelTrainer() {
             </div>
 
             <div style={{ fontSize: FONT.sm, color: T.inkSoft, marginBottom: SPACE.md }}>{filtered.length} Karte(n)</div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: SPACE.sm }}>
               {filtered.map(c => (
                 <div key={c.id} className="row-link" style={{ ...surface(T), padding: `${SPACE.md}px ${SPACE.lg}px`, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: SPACE.md }}>
                   <div style={{ minWidth: 0 }}>
@@ -1118,7 +1118,7 @@ export default function VokabelTrainer() {
         transform: 'translateX(-50%)', zIndex: 20,
         background: hexToRgba(T.bgElev, .95), backdropFilter: 'blur(12px)',
         border: `1px solid ${T.border}`, borderRadius: RADIUS.pill,
-        boxShadow: T.shadowLift, padding: 5,
+        boxShadow: T.shadowLift, padding: SPACE.xs,
       }}>
         <div style={{ display: 'flex', gap: 2 }}>
           {navItems.map(([key, label, Icon]) => {
@@ -1126,7 +1126,7 @@ export default function VokabelTrainer() {
             return (
               <button key={key} className="press" onClick={() => setView(key)}
                 style={{
-                  display: 'flex', alignItems: 'center', gap: 6, padding: '9px 15px',
+                  display: 'flex', alignItems: 'center', gap: SPACE.xs, padding: `${SPACE.sm}px ${SPACE.md}px`,
                   borderRadius: RADIUS.pill, border: 'none', cursor: 'pointer', whiteSpace: 'nowrap',
                   background: active ? T.accentSoft : 'transparent',
                   color: active ? T.accent : T.inkSoft, fontSize: FONT.sm, fontWeight: active ? 600 : 500,
@@ -1142,7 +1142,7 @@ export default function VokabelTrainer() {
       {toast && (
         <div style={{
           position: 'fixed', bottom: `calc(${NAVBAR_H + SPACE.lg}px + env(safe-area-inset-bottom))`, left: '50%', transform: 'translateX(-50%)',
-          background: T.ink, color: T.bg, padding: '11px 20px', borderRadius: RADIUS.pill,
+          background: T.ink, color: T.bg, padding: `${SPACE.md}px ${SPACE.xl}px`, borderRadius: RADIUS.pill,
           fontSize: FONT.md, maxWidth: '90vw', textAlign: 'center', boxShadow: T.shadowLift, zIndex: 30,
         }}>
           {toast}
