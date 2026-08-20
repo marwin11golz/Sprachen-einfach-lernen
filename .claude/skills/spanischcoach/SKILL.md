@@ -1,6 +1,6 @@
 ---
 name: spanischcoach
-description: "Persönlicher Spanisch-Lerncoach mit Spaced Repetition (SM-2), kompatibel zur Vokabeltrainer-App 'Sprachen lernen' in diesem Repo. Nutze diese Skill immer, wenn der Nutzer Spanisch üben will, Vokabeln oder Sätze abgefragt/wiederholt haben möchte, eine neue Wortliste oder Datei mit Vokabeln einspielen will, nach fälligen Karten, seinem Lernfortschritt oder seiner Streak fragt, oder eine Lerneinheit startet - auch ohne die Wörter 'Spanischcoach' oder 'Spaced Repetition' zu benutzen, z. B. bei 'frag mich ein paar spanische Vokabeln ab', 'lass uns kurz Spanisch üben', 'ich hab hier eine Liste mit Wörtern', 'wie viele Karten sind heute fällig', 'guck dir das Konjugations-Blatt an und frag mich ab'."
+description: "Persönlicher Spanisch-Lerncoach mit Spaced Repetition (FSRS), kompatibel zur Vokabeltrainer-App 'Sprachen lernen' in diesem Repo. Nutze diese Skill immer, wenn der Nutzer Spanisch üben will, Vokabeln oder Sätze abgefragt/wiederholt haben möchte, eine neue Wortliste oder Datei mit Vokabeln einspielen will, nach fälligen Karten, seinem Lernfortschritt oder seiner Streak fragt, oder eine Lerneinheit startet - auch ohne die Wörter 'Spanischcoach' oder 'Spaced Repetition' zu benutzen, z. B. bei 'frag mich ein paar spanische Vokabeln ab', 'lass uns kurz Spanisch üben', 'ich hab hier eine Liste mit Wörtern', 'wie viele Karten sind heute fällig', 'guck dir das Konjugations-Blatt an und frag mich ab'."
 ---
 
 # Spanischcoach
@@ -12,9 +12,10 @@ Repo, siehe `src/App.jsx`) - dadurch sind Karten aus der Chat-Skill und aus
 der Web-App gegenseitig austauschbar.
 
 Alle Aktionen laufen über das Script `scripts/vocab.js` (reines Node,
-keine Abhängigkeiten). Das Script rechnet die SM-2-Intervalle deterministisch
+keine Abhängigkeiten). Das Script rechnet die FSRS-Intervalle deterministisch
 aus - nicht selbst im Kopf nachrechnen, sondern immer über das Script gehen,
-damit Ease/Interval/Fälligkeitsdatum exakt mit der App übereinstimmen.
+damit Stabilität/Schwierigkeit/Intervall/Fälligkeitsdatum exakt mit der App
+übereinstimmen.
 
 ```bash
 node .claude/skills/spanischcoach/scripts/vocab.js <befehl> [optionen]
@@ -89,7 +90,7 @@ Streak - direkt im Chat wiedergeben, keine eigene Neuberechnung nötig.
 ## Zusammenspiel mit der App "Sprachen lernen"
 
 Diese Skill und die App in `src/App.jsx` teilen sich Datenmodell und
-SM-2-Formeln (siehe `rate()` in `scripts/vocab.js`, bewusst dupliziert statt
+FSRS-Formeln (siehe `rate()` in `scripts/vocab.js`, bewusst dupliziert statt
 importiert, damit die Skill ohne Build-Schritt läuft). Über "Karten → Export"
 in der App lässt sich eine JSON-Sicherung erzeugen, die sich - nach Bedarf -
 in `data/spanischcoach/vocab.json` einspielen lässt, und umgekehrt lassen

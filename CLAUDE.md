@@ -21,7 +21,8 @@ This is a single-page Vite + React app, "Sprachen lernen" — a flashcard-based 
 
 The data layer is deliberately separated from the UI so that database work and design work don't collide:
 
-- **`src/lib/srs.js`** — the domain logic: `rate(card, rating)` (the SM-2-like scheduler computing `ease`/`interval`/`dueDate`/`repetitions` from a rating of `again`/`hard`/`good`/`easy`), `levenshtein()`, the gap-sentence helpers (`parseGapLine`/`maskSentence`/`revealSentence`), `deckKeyOf`/`deckLabelOf`, and the card factories `newVocabCard`/`newGapCard`. **This is the single source of truth for the card shape and the scheduling algorithm.** `rate()` and the card shape are duplicated (not imported) in `.claude/skills/spanischcoach/scripts/vocab.js` so that skill runs as a dependency-free Node script — **changes here must be mirrored there.**
+- **`src/lib/srs.js`** — the domain logic: `rate(card, rating)` (computing `dueDate`/`interval`/`repetitions`/`stability`/`difficulty` from a rating of `again`/`hard`/`good`/`easy`, on top of the FSRS core in `src/lib/fsrs.js`), `levenshtein()`, the gap-sentence helpers (`parseGapLine`/`maskSentence`/`revealSentence`), `deckKeyOf`/`deckLabelOf`, and the card factories `newVocabCard`/`newGapCard`. **This is the single source of truth for the card shape and the scheduling algorithm.** `rate()`, the FSRS formulas in `fsrs.js`, and the card shape are duplicated (not imported) in `.claude/skills/spanischcoach/scripts/vocab.js` so that skill runs as a dependency-free Node script — **changes here must be mirrored there.**
+- **`src/lib/fsrs.js`** — the FSRS-6 scheduling core (stability/difficulty/retrievability/interval formulas, standard weights). Pure functions, no imports — the single source that `srs.js` builds on and that gets duplicated verbatim into `vocab.js`.
 - **`src/lib/storage.js`** — `localStorage` read/write plus schema migration. Persisted shape (v2): `{ schemaVersion, cards, activityLocal, activityRemote, flipped, lastUserId, lastSyncAt }` under the key `lucy-lernt-sprachen-vocab-data`.
 - **`src/lib/merge.js`** — `mergeCards()` (per-card last-write-wins on `updatedAt`), `combinedActivity()`, `purgeOldTombstones()`. Used both by the import path and by cloud sync, so there is exactly one merge rule.
 - **`src/lib/theme.js`** — `THEMES` (light/dark palettes) and the button style helpers. Inline styles throughout; no CSS framework.
@@ -37,7 +38,7 @@ The data layer is deliberately separated from the UI so that database work and d
 
 ### `.claude/skills/spanischcoach/`
 
-A Claude Code skill that lets Claude act as a chat-based Spanish coach, sharing the app's data model and SM-2 formulas so cards are interchangeable between the app and chat sessions:
+A Claude Code skill that lets Claude act as a chat-based Spanish coach, sharing the app's data model and FSRS formulas so cards are interchangeable between the app and chat sessions:
 
 - `scripts/vocab.js` — dependency-free Node ESM CLI (`add-vocab`, `add-gap`, `due`, `rate`, `stats`, `list`) that reads/writes `data/spanischcoach/vocab.json` in the same shape as the app's JSON export. Card ratings should always go through this script rather than being computed by hand, so results stay bit-for-bit consistent with `rate()` in `src/lib/srs.js`.
 - The app's "Karten → Export/Import" feature is the bridge for moving cards between `localStorage` (browser) and `data/spanischcoach/vocab.json` (repo/chat).
