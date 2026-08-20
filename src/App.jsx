@@ -9,7 +9,7 @@ import {
   parseGapLine, revealSentence, splitAnswer,
   deckKeyOf, deckLabelOf,
   newVocabCard, newGapCard,
-  VOCAB_PAIRS, SENTENCE_LANGS,
+  VOCAB_PAIRS, SENTENCE_LANGS, langCodeOf,
 } from './lib/srs.js';
 import {
   THEMES, hexToRgba, SPACE, RADIUS, FONT, NAVBAR_H,
@@ -100,6 +100,18 @@ export default function VokabelTrainer() {
   // Dunkles Design nach Systemeinstellung.
   useEffect(() => {
     if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) setTheme('dark');
+  }, []);
+
+  // Die Stimmenliste laedt der Browser nachtraeglich - beim ersten Aufruf ist
+  // sie meist noch leer. Deshalb einmal jetzt und erneut, sobald sie steht.
+  const voicesRef = useRef([]);
+  useEffect(() => {
+    const synth = window.speechSynthesis;
+    if (!synth) return;
+    const load = () => { voicesRef.current = synth.getVoices() || []; };
+    load();
+    synth.addEventListener?.('voiceschanged', load);
+    return () => synth.removeEventListener?.('voiceschanged', load);
   }, []);
 
   const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(null), 2200); };
@@ -291,6 +303,15 @@ export default function VokabelTrainer() {
   // steht er auf der Vorderseite und wuerde sonst gar nicht mehr auftauchen.
   const displayExample = backParts.example || frontParts.example;
 
+  // Welche Sprache auf welcher Seite steht - entscheidet, wie vorgelesen wird.
+  // Bei Lueckensaetzen sind beide Seiten dieselbe Sprache.
+  const frontLang = current
+    ? (current.type === 'gap' ? current.language : (flipped ? current.langB : current.langA))
+    : null;
+  const backLang = current
+    ? (current.type === 'gap' ? current.language : (flipped ? current.langA : current.langB))
+    : null;
+
   const checkWrite = () => {
     if (!current) return;
     const dist = levenshtein(writeInput, displayBack);
@@ -384,10 +405,30 @@ export default function VokabelTrainer() {
 
   if (!loaded) return null;
 
-  const speak = (text) => {
+  // Vorlesen in der Sprache der jeweiligen Kartenseite. Ohne gesetzte Sprache
+  // nimmt der Browser die Standardstimme - ein englisches "future" klaenge
+  // dann deutsch ausgesprochen.
+  const speak = (text, langName) => {
     try {
+      const synth = window.speechSynthesis;
+      if (!synth || !text) return;
       const u = new SpeechSynthesisUtterance(text);
-      window.speechSynthesis.speak(u);
+      const code = langCodeOf(langName);
+      if (code) {
+        u.lang = code;
+        // Einige Browser richten sich nur nach einer ausdruecklich gesetzten
+        // Stimme und ignorieren u.lang. Erst die genaue Regionalstimme
+        // versuchen (es-ES), sonst irgendeine der Sprache (es-MX).
+        const base = code.slice(0, 2).toLowerCase();
+        const voices = voicesRef.current;
+        const voice = voices.find(v => v.lang?.replace('_', '-').toLowerCase() === code.toLowerCase())
+          || voices.find(v => v.lang?.replace('_', '-').toLowerCase().startsWith(base));
+        if (voice) u.voice = voice;
+      }
+      // Ein noch laufender Satz wuerde den neuen sonst in die Warteschlange
+      // schieben, statt ihn sofort zu sprechen.
+      synth.cancel();
+      synth.speak(u);
     } catch (e) {}
   };
 
@@ -517,8 +558,9 @@ export default function VokabelTrainer() {
                 </div>
 
                 {(!isWriteInteraction || revealed) && (
-                  <button className="press" onClick={() => speak(current.type === 'gap' ? revealSentence(current.sentence) : displayFront)}
-                    aria-label="Vorlesen"
+                  <button className="press"
+                    onClick={() => speak(current.type === 'gap' ? revealSentence(current.sentence) : displayFront, frontLang)}
+                    aria-label={`Vorlesen (${frontLang})`}
                     style={{ background: 'none', border: 'none', cursor: 'pointer', color: T.inkSoft, marginTop: SPACE.md, padding: 6 }}>
                     <Volume2 size={20} />
                   </button>
@@ -527,6 +569,13 @@ export default function VokabelTrainer() {
                 {!isWriteInteraction && revealed && (
                   <div className="rise-in" style={{ marginTop: SPACE.xl, paddingTop: SPACE.xl, borderTop: `1px solid ${T.border}` }}>
                     <div style={{ fontSize: 30, color: T.accent, fontWeight: 600, lineHeight: 1.35 }}>{displayBack}</div>
+                    {/* Beim umgedrehten Lernen steht das Fremdwort hier - ohne
+                        eigenen Knopf waere gerade das nicht zu hoeren. */}
+                    <button className="press" onClick={() => speak(displayBack, backLang)}
+                      aria-label={`Antwort vorlesen (${backLang})`}
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: T.inkSoft, marginTop: SPACE.sm, padding: 6 }}>
+                      <Volume2 size={18} />
+                    </button>
                     {displayExample && (
                       <div style={{ fontSize: FONT.md, color: T.inkSoft, marginTop: SPACE.sm, lineHeight: 1.5 }}>{displayExample}</div>
                     )}
@@ -556,6 +605,12 @@ export default function VokabelTrainer() {
                         <div style={{ fontSize: 24, marginTop: SPACE.lg, fontWeight: 600, lineHeight: 1.4 }}>
                           {current.type === 'gap' ? revealSentence(current.sentence) : displayBack}
                         </div>
+                        <button className="press"
+                          onClick={() => speak(current.type === 'gap' ? revealSentence(current.sentence) : displayBack, backLang)}
+                          aria-label={`Antwort vorlesen (${backLang})`}
+                          style={{ background: 'none', border: 'none', cursor: 'pointer', color: T.inkSoft, marginTop: SPACE.sm, padding: 6 }}>
+                          <Volume2 size={18} />
+                        </button>
                         {current.type === 'vocab' && displayExample && (
                           <div style={{ fontSize: FONT.md, color: T.inkSoft, marginTop: SPACE.sm, lineHeight: 1.5 }}>{displayExample}</div>
                         )}
