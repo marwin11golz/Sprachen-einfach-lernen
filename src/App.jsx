@@ -295,8 +295,14 @@ export default function VokabelTrainer() {
   // getippt/geprüft wird nur die Antwort, der Beispielsatz ist reiner Kontext beim Aufdecken.
   const frontRaw = current ? (current.type === 'vocab' && flipped ? current.back : current.front) : '';
   const backRaw = current ? (current.type === 'vocab' && flipped ? current.front : current.back) : '';
-  const frontParts = splitAnswer(frontRaw);
-  const backParts = splitAnswer(backRaw);
+  // Nur Vokabelkarten kennen die Trennung Antwort/Beispielsatz. Bei einem
+  // Lueckensatz waere ein Gedankenstrich mitten im Satz ("Yo ▁▁▁ fruta - y
+  // mi hermana come pan.") sonst ein Trenner, und die zweite Satzhaelfte
+  // verschwaende aus der Frage.
+  const asIs = (text) => ({ answer: text, example: null });
+  const splitSides = current?.type === 'vocab' ? splitAnswer : asIs;
+  const frontParts = splitSides(frontRaw);
+  const backParts = splitSides(backRaw);
   const displayFront = frontParts.answer;
   const displayBack = backParts.answer;
   // Der Beispielsatz gehoert zur Karte, nicht zu einer Seite: beim Umdrehen

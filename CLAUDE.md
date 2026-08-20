@@ -69,8 +69,7 @@ The data layer is deliberately separated from the UI so that database work and d
 A skill that lets Claude act as a chat-based Spanish coach, sharing the app's data model and FSRS formulas so cards are interchangeable between the app and chat sessions.
 
 - `scripts/vocab.js` — dependency-free Node ESM CLI (`add-vocab`, `add-gap`, `due`, `rate`, `stats`, `list`) reading/writing `data/spanischcoach/vocab.json` in the same shape as the app's JSON export. Ratings should always go through this script rather than being computed by hand, so results stay bit-for-bit consistent with `rate()`.
-- **`rate()`, the FSRS formulas, and the card shape are duplicated (not imported) here** so the script runs without a build step — **changes to `fsrs.js`/`rate()`/the card shape must be mirrored into `vocab.js`.** UI-only concerns (theme, view logic, the language picker lists) are not part of that obligation.
-- **Known gap:** `vocab.js` does not implement `splitAnswer()`. A card whose back contains `Merger | With the merger…` will be quizzed by the skill with the example sentence included in the expected answer.
+- **`rate()`, the FSRS formulas, the card shape, and `splitAnswer()` are duplicated (not imported) here** so the script runs without a build step — **changes to any of those must be mirrored into `vocab.js`.** `splitAnswer()` is part of the obligation because it decides what counts as a correct answer: if the two sides disagree, something the app accepts would be marked wrong in chat. UI-only concerns (theme, view logic, the language picker lists) are not.
 - The app's "Karten → Export/Import" is the bridge between `localStorage` (browser) and `data/spanischcoach/vocab.json` (repo/chat), and remains the only way to move cards without signing in.
 
 ## Language
