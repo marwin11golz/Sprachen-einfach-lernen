@@ -6,7 +6,7 @@ import {
 
 import {
   levenshtein, todayISO,
-  parseGapLine, revealSentence,
+  parseGapLine, revealSentence, splitAnswer,
   deckKeyOf, deckLabelOf,
   newVocabCard, newGapCard,
   VOCAB_PAIRS, SENTENCE_LANGS,
@@ -278,9 +278,13 @@ export default function VokabelTrainer() {
     setCurrent(null);
   };
 
-  // Bei umgedrehter Vokabel werden Vorder- und Rückseite für Anzeige/Prüfung vertauscht
-  const displayFront = current ? (current.type === 'vocab' && flipped ? current.back : current.front) : '';
-  const displayBack = current ? (current.type === 'vocab' && flipped ? current.front : current.back) : '';
+  // Bei umgedrehter Vokabel werden Vorder- und Rückseite für Anzeige/Prüfung vertauscht.
+  // Ein "|" in der Rückseite trennt die eigentliche Antwort von einem Beispielsatz -
+  // getippt/geprüft wird nur die Antwort, der Beispielsatz ist reiner Kontext beim Aufdecken.
+  const frontRaw = current ? (current.type === 'vocab' && flipped ? current.back : current.front) : '';
+  const backRaw = current ? (current.type === 'vocab' && flipped ? current.front : current.back) : '';
+  const displayFront = splitAnswer(frontRaw).answer;
+  const { answer: displayBack, example: displayExample } = splitAnswer(backRaw);
 
   const checkWrite = () => {
     if (!current) return;
@@ -518,6 +522,9 @@ export default function VokabelTrainer() {
                 {!isWriteInteraction && revealed && (
                   <div className="rise-in" style={{ marginTop: SPACE.xl, paddingTop: SPACE.xl, borderTop: `1px solid ${T.border}` }}>
                     <div style={{ fontSize: 30, color: T.accent, fontWeight: 600, lineHeight: 1.35 }}>{displayBack}</div>
+                    {displayExample && (
+                      <div style={{ fontSize: FONT.md, color: T.inkSoft, marginTop: SPACE.sm, lineHeight: 1.5 }}>{displayExample}</div>
+                    )}
                   </div>
                 )}
 
@@ -544,6 +551,9 @@ export default function VokabelTrainer() {
                         <div style={{ fontSize: 24, marginTop: SPACE.lg, fontWeight: 600, lineHeight: 1.4 }}>
                           {current.type === 'gap' ? revealSentence(current.sentence) : displayBack}
                         </div>
+                        {current.type === 'vocab' && displayExample && (
+                          <div style={{ fontSize: FONT.md, color: T.inkSoft, marginTop: SPACE.sm, lineHeight: 1.5 }}>{displayExample}</div>
+                        )}
                       </div>
                     )}
                   </div>
@@ -827,7 +837,7 @@ export default function VokabelTrainer() {
                     {difficultCards.map((c, i) => (
                       <div key={c.id} style={{ display: 'flex', justifyContent: 'space-between', padding: `${SPACE.sm}px 0`, borderTop: i > 0 ? `1px solid ${T.border}` : 'none', gap: SPACE.md }}>
                         <span style={{ fontSize: FONT.md, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                          {c.type === 'gap' ? revealSentence(c.sentence) : `${c.front} → ${c.back}`}
+                          {c.type === 'gap' ? revealSentence(c.sentence) : `${c.front} → ${splitAnswer(c.back).answer}`}
                         </span>
                         <span className="mono" style={{ color: T.danger, fontSize: FONT.sm, flexShrink: 0 }}>{c.wrong}×</span>
                       </div>
@@ -908,7 +918,7 @@ export default function VokabelTrainer() {
 
                 <label style={{ fontSize: FONT.sm, color: T.inkSoft, display: 'block', marginBottom: SPACE.sm, fontWeight: 500 }}>Vokabeln</label>
                 <textarea value={addText} onChange={e => setAddText(e.target.value)}
-                  placeholder={'casa = Haus\nperro = Hund\ncomer = essen'}
+                  placeholder={'casa = Haus\nperro = Hund\nFusion = Merger | With the merger, a company can become more efficient.'}
                   rows={8}
                   style={{ ...inputStyle, resize: 'vertical', lineHeight: 1.7, fontFamily: "'IBM Plex Mono', monospace", fontSize: FONT.base }} />
 
@@ -920,7 +930,7 @@ export default function VokabelTrainer() {
                   <input ref={vocabFileRef} type="file" accept=".txt,.csv" style={{ display: 'none' }} onChange={e => readFileInto(e, setAddText)} />
                 </div>
                 <div style={{ marginTop: SPACE.lg, fontSize: FONT.sm, color: T.inkSoft, lineHeight: 1.6 }}>
-                  Eine Zeile pro Karte im Format <span className="mono">Wort = Übersetzung</span> (auch Komma oder Semikolon gehen). Eine hochgeladene .txt/.csv landet erst im Feld – du kannst sie also vorher prüfen.
+                  Eine Zeile pro Karte im Format <span className="mono">Wort = Übersetzung</span> (auch Komma oder Semikolon gehen). Optional mit Beispielsatz: <span className="mono">Übersetzung | Beispielsatz</span> – im Tippen-Modus zählt dann nur die Übersetzung vor dem Strich, der Satz dient nur als Kontext beim Aufdecken. Eine hochgeladene .txt/.csv landet erst im Feld – du kannst sie also vorher prüfen.
                 </div>
               </div>
             )}
@@ -1013,7 +1023,7 @@ export default function VokabelTrainer() {
                     {c.type === 'gap' ? (
                       <div style={{ fontWeight: 600, fontSize: FONT.md, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{revealSentence(c.sentence)}</div>
                     ) : (
-                      <div style={{ fontWeight: 600, fontSize: FONT.md }}>{c.front} <span style={{ color: T.inkSoft, fontWeight: 400 }}>→</span> {c.back}</div>
+                      <div style={{ fontWeight: 600, fontSize: FONT.md }}>{c.front} <span style={{ color: T.inkSoft, fontWeight: 400 }}>→</span> {splitAnswer(c.back).answer}</div>
                     )}
                     <div className="mono" style={{ fontSize: FONT.xs, color: T.inkSoft, marginTop: 3 }}>
                       {c.type === 'gap' ? `Satz · ${c.language}` : `${c.langA} → ${c.langB}`} · fällig {c.dueDate} · {c.totalReviews || 0}×
@@ -1035,26 +1045,28 @@ export default function VokabelTrainer() {
         )}
       </div>
 
-      {/* Navigationsleiste unten - am Handy die Hauptnavigation */}
+      {/* Navigationsleiste unten - schwebende Pille mittig statt einer
+          Leiste von Rand zu Rand, damit sie nicht an den Bildschirmkanten klebt. */}
       <div className="nav-bottom" style={{
-        position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 20,
+        position: 'fixed', left: '50%', bottom: `calc(${SPACE.lg}px + env(safe-area-inset-bottom))`,
+        transform: 'translateX(-50%)', zIndex: 20,
         background: hexToRgba(T.bgElev, .95), backdropFilter: 'blur(12px)',
-        borderTop: `1px solid ${T.border}`,
-        paddingBottom: 'env(safe-area-inset-bottom)',
+        border: `1px solid ${T.border}`, borderRadius: RADIUS.pill,
+        boxShadow: T.shadowLift, padding: 5,
       }}>
-        <div style={{ display: 'flex', height: NAVBAR_H }}>
+        <div style={{ display: 'flex', gap: 2 }}>
           {navItems.map(([key, label, Icon]) => {
             const active = view === key;
             return (
-              <button key={key} onClick={() => setView(key)}
+              <button key={key} className="press" onClick={() => setView(key)}
                 style={{
-                  flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-                  gap: 3, border: 'none', background: 'none', cursor: 'pointer',
-                  color: active ? T.accent : T.inkSoft, fontSize: FONT.xs, fontWeight: active ? 600 : 500,
-                  transition: 'color .15s',
+                  display: 'flex', alignItems: 'center', gap: 6, padding: '9px 15px',
+                  borderRadius: RADIUS.pill, border: 'none', cursor: 'pointer', whiteSpace: 'nowrap',
+                  background: active ? T.accentSoft : 'transparent',
+                  color: active ? T.accent : T.inkSoft, fontSize: FONT.sm, fontWeight: active ? 600 : 500,
+                  transition: 'background .15s, color .15s',
                 }}>
-                <Icon size={21} strokeWidth={active ? 2.4 : 1.9} />
-                {label}
+                <Icon size={17} strokeWidth={active ? 2.3 : 1.9} /> {label}
               </button>
             );
           })}

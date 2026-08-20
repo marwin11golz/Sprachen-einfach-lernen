@@ -15,9 +15,10 @@ export const SPACE = { xs: 4, sm: 8, md: 12, lg: 16, xl: 24, xxl: 32 };
 export const RADIUS = { sm: 6, md: 10, lg: 16, pill: 999 };
 export const FONT = { xs: 11, sm: 12, base: 13, md: 14, lg: 16, xl: 20, xxl: 26, hero: 44 };
 
-// Hoehe der unteren Navigationsleiste. Der Inhalt braucht unten genau so viel
-// Luft, damit die Leiste nichts verdeckt - deshalb an einer Stelle definiert.
-export const NAVBAR_H = 62;
+// Platzbedarf der schwebenden unteren Navigation (Pillenhoehe + Abstand zum
+// Bildschirmrand). Der Inhalt braucht unten genau so viel Luft, damit die
+// Navigation nichts verdeckt - deshalb an einer Stelle definiert.
+export const NAVBAR_H = 84;
 
 // ---------- Sprachpass-Farbwelt ----------
 export const THEMES = {
