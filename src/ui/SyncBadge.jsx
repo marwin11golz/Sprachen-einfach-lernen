@@ -6,6 +6,7 @@
 
 import React from 'react';
 import { Cloud, CloudOff, RefreshCw, AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { RADIUS, FONT } from '../lib/theme.js';
 
 const LABELS = {
   disabled:  { text: 'lokal',        Icon: CloudOff },
@@ -31,10 +32,10 @@ export default function SyncBadge({ T, state, onClick }) {
       title="Konto und Abgleich"
       style={{
         display: 'flex', alignItems: 'center', gap: 6,
-        padding: '8px 12px', borderRadius: 9, cursor: 'pointer',
+        padding: '8px 13px', borderRadius: RADIUS.pill, cursor: 'pointer',
         border: tone.bg === 'transparent' ? `1px solid ${T.border}` : 'none',
         background: tone.bg, color: tone.fg,
-        fontSize: 12.5, fontWeight: 500, whiteSpace: 'nowrap',
+        fontSize: FONT.sm, fontWeight: 500, whiteSpace: 'nowrap',
       }}
     >
       <Icon size={14} /> {text}

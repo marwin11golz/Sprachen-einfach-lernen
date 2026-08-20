@@ -3,7 +3,7 @@
 
 import React, { useState } from 'react';
 import { CheckCircle2, RefreshCw, LogOut, CloudOff } from 'lucide-react';
-import { btnPrimary, btnSecondary } from '../lib/theme.js';
+import { btnPrimary, btnSecondary, btnGhost, surface, SPACE, RADIUS, FONT } from '../lib/theme.js';
 
 function fmtTime(iso) {
   if (!iso) return 'noch nie';
@@ -25,22 +25,22 @@ export default function AuthScreen({
   const [notice, setNotice] = useState(null);
 
   const card = {
-    background: T.bgElev, border: `1px solid ${T.border}`, borderRadius: 16,
-    padding: '22px 20px', boxShadow: T.shadow, maxWidth: 420, margin: '0 auto',
+    ...surface(T, { lift: true }),
+    padding: SPACE.xl, maxWidth: 420, margin: '0 auto',
   };
   const input = {
-    width: '100%', padding: '11px 13px', borderRadius: 10,
+    width: '100%', padding: '13px 15px', borderRadius: RADIUS.md,
     border: `1px solid ${T.border}`, background: T.bg, color: T.ink,
-    fontSize: 15, marginBottom: 10,
+    fontSize: FONT.md, marginBottom: SPACE.md, outline: 'none',
   };
 
   if (!auth.cloudConfigured) {
     return (
       <div style={card}>
-        <div className="disp" style={{ fontSize: 19, fontWeight: 600, marginBottom: 10 }}>
+        <div style={{ fontSize: FONT.xl, fontWeight: 700, marginBottom: 10 }}>
           Abgleich nicht eingerichtet
         </div>
-        <div style={{ fontSize: 13.5, color: T.inkSoft, lineHeight: 1.6 }}>
+        <div style={{ fontSize: FONT.base, color: T.inkSoft, lineHeight: 1.6 }}>
           Für diese Fassung der App sind keine Zugangsdaten zur Datenbank hinterlegt.
           Die App funktioniert vollständig – deine Vokabeln bleiben aber nur auf
           diesem Gerät.
@@ -54,17 +54,17 @@ export default function AuthScreen({
   if (auth.user) {
     return (
       <div style={card}>
-        <div className="disp" style={{ fontSize: 19, fontWeight: 600, marginBottom: 4 }}>
+        <div style={{ fontSize: FONT.xl, fontWeight: 700, marginBottom: 4 }}>
           Angemeldet
         </div>
-        <div className="mono" style={{ fontSize: 12.5, color: T.inkSoft, marginBottom: 18 }}>
+        <div className="mono" style={{ fontSize: FONT.sm, color: T.inkSoft, marginBottom: 18 }}>
           {auth.user.email}
         </div>
 
         <div style={{
           display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px',
-          borderRadius: 10, background: T.accentSoft, color: T.accent,
-          fontSize: 13, marginBottom: 8,
+          borderRadius: RADIUS.pill, background: T.accentSoft, color: T.accent,
+          fontSize: FONT.base, marginBottom: 8,
         }}>
           <CheckCircle2 size={16} />
           <span>{cardCount} Karte(n) · zuletzt abgeglichen {fmtTime(sync.lastSyncAt)}</span>
@@ -72,14 +72,14 @@ export default function AuthScreen({
 
         {sync.syncError && (
           <div style={{
-            padding: '10px 12px', borderRadius: 10, background: T.dangerSoft,
-            color: T.danger, fontSize: 12.5, marginBottom: 8, lineHeight: 1.5,
+            padding: '10px 12px', borderRadius: RADIUS.md, background: T.dangerSoft,
+            color: T.danger, fontSize: FONT.sm, marginBottom: 8, lineHeight: 1.5,
           }}>
             Letzter Abgleich fehlgeschlagen: {sync.syncError}
           </div>
         )}
 
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 12 }}>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 12, alignItems: 'center' }}>
           <button onClick={sync.syncNow} style={btnPrimary(T)}>
             <RefreshCw size={14} style={{ marginRight: 6 }} /> Jetzt abgleichen
           </button>
@@ -92,12 +92,12 @@ export default function AuthScreen({
           >
             <LogOut size={14} style={{ marginRight: 6 }} /> Abmelden
           </button>
-          <button onClick={onBack} style={{ ...btnSecondary(T), border: 'none', background: 'none', color: T.inkSoft }}>
+          <button onClick={onBack} style={btnGhost(T)}>
             Zurück
           </button>
         </div>
 
-        <div style={{ fontSize: 11.5, color: T.inkSoft, marginTop: 16, lineHeight: 1.6 }}>
+        <div style={{ fontSize: FONT.xs, color: T.inkSoft, marginTop: 16, lineHeight: 1.6 }}>
           Melde dich auf deinem anderen Gerät mit derselben E-Mail an, dann haben
           beide denselben Stand. Ein zweites Konto wäre ein zweiter, getrennter
           Kartenstapel.
@@ -121,10 +121,10 @@ export default function AuthScreen({
 
   return (
     <div style={card}>
-      <div className="disp" style={{ fontSize: 19, fontWeight: 600, marginBottom: 6 }}>
+      <div style={{ fontSize: FONT.xl, fontWeight: 700, marginBottom: 6 }}>
         {mode === 'signin' ? 'Anmelden' : 'Konto erstellen'}
       </div>
-      <div style={{ fontSize: 13, color: T.inkSoft, marginBottom: 18, lineHeight: 1.6 }}>
+      <div style={{ fontSize: FONT.base, color: T.inkSoft, marginBottom: 18, lineHeight: 1.6 }}>
         Damit Handy und iPad dieselben Vokabeln haben. Ohne Anmeldung funktioniert
         die App weiter – die Karten bleiben dann nur auf diesem Gerät.
       </div>
@@ -142,12 +142,12 @@ export default function AuthScreen({
         />
 
         {auth.authError && (
-          <div style={{ color: T.danger, fontSize: 12.5, marginBottom: 10, lineHeight: 1.5 }}>
+          <div style={{ color: T.danger, fontSize: FONT.sm, marginBottom: 10, lineHeight: 1.5 }}>
             {auth.authError}
           </div>
         )}
         {notice && (
-          <div style={{ color: T.success, fontSize: 12.5, marginBottom: 10, lineHeight: 1.5 }}>
+          <div style={{ color: T.success, fontSize: FONT.sm, marginBottom: 10, lineHeight: 1.5 }}>
             {notice}
           </div>
         )}
@@ -159,18 +159,18 @@ export default function AuthScreen({
 
       <button
         onClick={() => { setMode(m => (m === 'signin' ? 'signup' : 'signin')); auth.setAuthError(null); setNotice(null); }}
-        style={{ background: 'none', border: 'none', color: T.inkSoft, fontSize: 12.5, cursor: 'pointer', textDecoration: 'underline', marginTop: 14 }}
+        style={{ ...btnGhost(T), textDecoration: 'underline', marginTop: 14 }}
       >
         {mode === 'signin' ? 'Noch kein Konto? Konto erstellen' : 'Schon ein Konto? Anmelden'}
       </button>
 
       <div style={{ marginTop: 6 }}>
-        <button onClick={onBack} style={{ background: 'none', border: 'none', color: T.inkSoft, fontSize: 12.5, cursor: 'pointer' }}>
+        <button onClick={onBack} style={btnGhost(T)}>
           Zurück
         </button>
       </div>
 
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11.5, color: T.inkSoft, marginTop: 18 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: FONT.xs, color: T.inkSoft, marginTop: 18 }}>
         <CloudOff size={13} /> Ohne Anmeldung: alles bleibt lokal auf diesem Gerät.
       </div>
     </div>
