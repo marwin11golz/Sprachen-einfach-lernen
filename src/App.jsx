@@ -1035,26 +1035,28 @@ export default function VokabelTrainer() {
         )}
       </div>
 
-      {/* Navigationsleiste unten - am Handy die Hauptnavigation */}
+      {/* Navigationsleiste unten - schwebende Pille mittig statt einer
+          Leiste von Rand zu Rand, damit sie nicht an den Bildschirmkanten klebt. */}
       <div className="nav-bottom" style={{
-        position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 20,
+        position: 'fixed', left: '50%', bottom: `calc(${SPACE.lg}px + env(safe-area-inset-bottom))`,
+        transform: 'translateX(-50%)', zIndex: 20,
         background: hexToRgba(T.bgElev, .95), backdropFilter: 'blur(12px)',
-        borderTop: `1px solid ${T.border}`,
-        paddingBottom: 'env(safe-area-inset-bottom)',
+        border: `1px solid ${T.border}`, borderRadius: RADIUS.pill,
+        boxShadow: T.shadowLift, padding: 5,
       }}>
-        <div style={{ display: 'flex', height: NAVBAR_H }}>
+        <div style={{ display: 'flex', gap: 2 }}>
           {navItems.map(([key, label, Icon]) => {
             const active = view === key;
             return (
-              <button key={key} onClick={() => setView(key)}
+              <button key={key} className="press" onClick={() => setView(key)}
                 style={{
-                  flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-                  gap: 3, border: 'none', background: 'none', cursor: 'pointer',
-                  color: active ? T.accent : T.inkSoft, fontSize: FONT.xs, fontWeight: active ? 600 : 500,
-                  transition: 'color .15s',
+                  display: 'flex', alignItems: 'center', gap: 6, padding: '9px 15px',
+                  borderRadius: RADIUS.pill, border: 'none', cursor: 'pointer', whiteSpace: 'nowrap',
+                  background: active ? T.accentSoft : 'transparent',
+                  color: active ? T.accent : T.inkSoft, fontSize: FONT.sm, fontWeight: active ? 600 : 500,
+                  transition: 'background .15s, color .15s',
                 }}>
-                <Icon size={21} strokeWidth={active ? 2.4 : 1.9} />
-                {label}
+                <Icon size={17} strokeWidth={active ? 2.3 : 1.9} /> {label}
               </button>
             );
           })}
