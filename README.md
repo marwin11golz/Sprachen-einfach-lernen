@@ -1,4 +1,4 @@
-# Lucy lernt Sprachen
+# Sprachen lernen
 
 Vokabeltrainer mit Spaced Repetition (SM-2), Lückensätzen für Konjugationen und Dashboard.
 

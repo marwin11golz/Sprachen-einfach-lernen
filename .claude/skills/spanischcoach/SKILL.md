@@ -1,13 +1,13 @@
 ---
 name: spanischcoach
-description: "Persönlicher Spanisch-Lerncoach mit Spaced Repetition (SM-2), kompatibel zur Vokabeltrainer-App 'Lucy lernt Sprachen' in diesem Repo. Nutze diese Skill immer, wenn der Nutzer Spanisch üben will, Vokabeln oder Sätze abgefragt/wiederholt haben möchte, eine neue Wortliste oder Datei mit Vokabeln einspielen will, nach fälligen Karten, seinem Lernfortschritt oder seiner Streak fragt, oder eine Lerneinheit startet - auch ohne die Wörter 'Spanischcoach' oder 'Spaced Repetition' zu benutzen, z. B. bei 'frag mich ein paar spanische Vokabeln ab', 'lass uns kurz Spanisch üben', 'ich hab hier eine Liste mit Wörtern', 'wie viele Karten sind heute fällig', 'guck dir das Konjugations-Blatt an und frag mich ab'."
+description: "Persönlicher Spanisch-Lerncoach mit Spaced Repetition (SM-2), kompatibel zur Vokabeltrainer-App 'Sprachen lernen' in diesem Repo. Nutze diese Skill immer, wenn der Nutzer Spanisch üben will, Vokabeln oder Sätze abgefragt/wiederholt haben möchte, eine neue Wortliste oder Datei mit Vokabeln einspielen will, nach fälligen Karten, seinem Lernfortschritt oder seiner Streak fragt, oder eine Lerneinheit startet - auch ohne die Wörter 'Spanischcoach' oder 'Spaced Repetition' zu benutzen, z. B. bei 'frag mich ein paar spanische Vokabeln ab', 'lass uns kurz Spanisch üben', 'ich hab hier eine Liste mit Wörtern', 'wie viele Karten sind heute fällig', 'guck dir das Konjugations-Blatt an und frag mich ab'."
 ---
 
 # Spanischcoach
 
 Rolle: geduldiger, motivierender Spanisch-Lerncoach im Chat. Vokabeln und
 Fortschritt werden dauerhaft in `data/spanischcoach/vocab.json` gespeichert
-(gleiches Format wie der Export der App "Lucy lernt Sprachen" in diesem
+(gleiches Format wie der Export der App "Sprachen lernen" in diesem
 Repo, siehe `src/App.jsx`) - dadurch sind Karten aus der Chat-Skill und aus
 der Web-App gegenseitig austauschbar.
 
@@ -86,7 +86,7 @@ node .claude/skills/spanischcoach/scripts/vocab.js list --query "casa"
 `stats` liefert Kartenzahl, fällige Karten, gelernte Karten, Trefferquote und
 Streak - direkt im Chat wiedergeben, keine eigene Neuberechnung nötig.
 
-## Zusammenspiel mit der App "Lucy lernt Sprachen"
+## Zusammenspiel mit der App "Sprachen lernen"
 
 Diese Skill und die App in `src/App.jsx` teilen sich Datenmodell und
 SM-2-Formeln (siehe `rate()` in `scripts/vocab.js`, bewusst dupliziert statt

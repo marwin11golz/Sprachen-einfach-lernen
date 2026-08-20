@@ -16,7 +16,7 @@ export default defineConfig({
         'icons/favicon-32.png',
       ],
       manifest: {
-        name: 'Lucy lernt Sprachen',
+        name: 'Sprachen lernen',
         short_name: 'Sprachen',
         description: 'Vokabeltrainer mit Spaced Repetition und Lückensätzen',
         lang: 'de',

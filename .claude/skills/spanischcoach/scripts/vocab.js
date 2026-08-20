@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Kommandozeilen-Werkzeug fuer den Spanischcoach.
 // Implementiert dieselbe SM-2-aehnliche Bewertungslogik wie src/lib/srs.js
-// ("Lucy lernt Sprachen"), damit Karten aus der Chat-Skill und aus der
+// ("Sprachen lernen"), damit Karten aus der Chat-Skill und aus der
 // Web-App austauschbar bleiben (gleiches JSON-Format, gleiche Formeln).
 //
 // Nutzung:
