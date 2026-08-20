@@ -84,14 +84,31 @@ export function rate(card, rating) {
 }
 
 // ---------- Übersetzung mit optionalem Beispielsatz ----------
-// "Merger | With the merger, a company can become more efficient." - beim
-// Tippen zaehlt nur der Teil vor dem Strich, der Beispielsatz dient nur als
-// Kontext beim Aufdecken. Ohne "|" wird der ganze Text als Antwort gewertet -
-// bestehende Karten ohne Beispielsatz sind also unveraendert.
+// "Haus | Ich benutze ein Haus." - beim Tippen zaehlt nur der Teil vor dem
+// Trenner, der Beispielsatz dient nur als Kontext beim Aufdecken.
+//
+// Erlaubte Trenner: "|" (auch ohne Leerzeichen) sowie Binde-/Gedankenstrich,
+// aber NUR mit Leerzeichen ringsum. Die Leerzeichen-Pflicht ist der Grund,
+// warum "E-Mail" oder "well-known" nicht versehentlich zerschnitten werden.
+// Der Gedankenstrich muss mit, weil Handy-Tastaturen " - " gern automatisch
+// in " – " umwandeln.
+//
+// Ohne Trenner gilt der ganze Text als Antwort - Karten ohne Beispielsatz
+// verhalten sich also unveraendert.
+const ANSWER_SEPARATOR = /\s*\|\s*|\s+[-–—]\s+/;
+
 export function splitAnswer(text) {
-  const i = text.indexOf('|');
-  if (i === -1) return { answer: text.trim(), example: null };
-  return { answer: text.slice(0, i).trim(), example: text.slice(i + 1).trim() };
+  const s = String(text ?? '');
+  const m = s.match(ANSWER_SEPARATOR);
+  if (!m) return { answer: s.trim(), example: null };
+
+  const answer = s.slice(0, m.index).trim();
+  const example = s.slice(m.index + m[0].length).trim();
+  // Steht der Trenner ganz vorn oder ganz hinten, war er nicht als Trennung
+  // gemeint - dann lieber den Originaltext behalten als eine leere Antwort
+  // zu erzeugen, gegen die niemand etwas Richtiges tippen kann.
+  if (!answer) return { answer: s.trim(), example: null };
+  return { answer, example: example || null };
 }
 
 // Tippfehler-Toleranz beim Abfragen getippter Antworten.
