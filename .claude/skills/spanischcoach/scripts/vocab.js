@@ -206,6 +206,35 @@ function parseGapLine(line) {
   return { sentence: line.trim(), front: mask, back: answer };
 }
 
+// Trennt bei Vokabelkarten die eigentliche Antwort von einem optionalen
+// Beispielsatz: "Merger | With the merger, a company can become more
+// efficient." Wortgleich mit splitAnswer() in src/lib/srs.js - beide Seiten
+// muessen dieselbe Antwort erwarten, sonst gilt im Chat als falsch, was in
+// der App richtig ist.
+//
+// Der Binde-/Gedankenstrich zaehlt nur mit Leerzeichen ringsum, damit
+// "E-Mail" und "well-known" heil bleiben.
+const ANSWER_SEPARATOR = /\s*\|\s*|\s+[-–—]\s+/;
+
+function splitAnswer(text) {
+  const s = String(text ?? '');
+  const m = s.match(ANSWER_SEPARATOR);
+  if (!m) return { answer: s.trim(), example: null };
+  const answer = s.slice(0, m.index).trim();
+  const example = s.slice(m.index + m[0].length).trim();
+  if (!answer) return { answer: s.trim(), example: null };
+  return { answer, example: example || null };
+}
+
+// Nur Vokabelkarten kennen die Trennung. Bei einem Lueckensatz waere ein
+// Gedankenstrich im Satz sonst ein Trenner und die zweite Satzhaelfte weg.
+function answerOf(card) {
+  return card.type === 'vocab' ? splitAnswer(card.back).answer : card.back;
+}
+function exampleOf(card) {
+  return card.type === 'vocab' ? splitAnswer(card.back).example : null;
+}
+
 function linesFromArgs(args) {
   let lines = [];
   if (args.file) lines.push(...fs.readFileSync(args.file, 'utf8').split('\n'));
@@ -228,7 +257,10 @@ function cmdAddVocab(args, dataPath) {
   }
   saveData(dataPath, data);
   console.log(`${added.length} Vokabel(n) hinzugefuegt (${langA} -> ${langB}).`);
-  added.forEach(c => console.log(`  [${c.id}] ${c.front} = ${c.back}`));
+  added.forEach(c => {
+    const ex = exampleOf(c);
+    console.log(`  [${c.id}] ${c.front} = ${answerOf(c)}${ex ? `   (Beispiel: ${ex})` : ''}`);
+  });
 }
 
 function cmdAddGap(args, dataPath) {
@@ -273,7 +305,7 @@ function cmdRate(args, dataPath) {
   data.cards[idx] = updated;
   data.activityLog[todayISO()] = (data.activityLog[todayISO()] || 0) + 1;
   saveData(dataPath, data);
-  console.log(`Aktualisiert: ${updated.type === 'gap' ? updated.sentence : `${updated.front} = ${updated.back}`}`);
+  console.log(`Aktualisiert: ${updated.type === 'gap' ? updated.sentence : `${updated.front} = ${answerOf(updated)}`}`);
   console.log(`  naechste Faelligkeit: ${updated.dueDate} (interval ${updated.interval}, ease ${updated.ease.toFixed(2)}, wiederholungen ${updated.repetitions})`);
 }
 
@@ -308,7 +340,9 @@ function cmdList(args, dataPath) {
     cards = cards.filter(c => (c.type === 'gap' ? `${c.sentence} ${c.back}` : `${c.front} ${c.back}`).toLowerCase().includes(q));
   }
   for (const c of cards) {
-    console.log(`${c.id}\t${c.type === 'gap' ? c.sentence : `${c.front} = ${c.back}`}\tfaellig ${c.dueDate}`);
+    const ex = exampleOf(c);
+    const text = c.type === 'gap' ? c.sentence : `${c.front} = ${answerOf(c)}`;
+    console.log(`${c.id}\t${text}\tfaellig ${c.dueDate}${ex ? `\tBeispiel: ${ex}` : ''}`);
   }
   console.log(`${cards.length} Karte(n).`);
 }

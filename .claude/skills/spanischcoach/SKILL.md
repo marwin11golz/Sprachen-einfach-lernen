@@ -36,6 +36,10 @@ node .claude/skills/spanischcoach/scripts/vocab.js add-vocab --file /pfad/zur/li
 - Eine Zeile pro Karte, Format `Vorderseite = Rückseite` (auch `;` oder `,`
   als Trenner). `--langA`/`--langB` bestimmen die Richtung; Standard ist
   Spanisch → Deutsch, bei Bedarf umdrehen (`--langA Deutsch --langB Spanisch`).
+- Optional mit Beispielsatz: `Fusion = Merger | With the merger, a company can
+  become more efficient.` Statt `|` geht auch ein Binde- oder Gedankenstrich
+  **mit Leerzeichen ringsum**. Abgefragt wird dann nur der Teil vor dem
+  Trenner – der Satz ist reiner Kontext (siehe „Lerneinheit“ unten).
 - Für Konjugations-/Lückensätze (die zu übende Form in eckigen Klammern):
 
 ```bash
@@ -58,7 +62,10 @@ Warnung - dem Nutzer kurz erklären, was nicht erkannt wurde, statt es stillschw
    maskierte Lücke, bei `vocab`-Karten das Wort), Nutzer antworten lassen.
 3. Antwort bewerten - kleine Tippfehler, fehlende Akzente oder offensichtliche
    Vertipper zählen als richtig (nicht pedantisch auf exakte Zeichenkette
-   bestehen, das Original toleriert das ebenfalls). Nach der Auflösung den
+   bestehen, das Original toleriert das ebenfalls). Trägt eine Karte einen
+   Beispielsatz, zählt **nur die Übersetzung vor dem Trenner** als Antwort -
+   den Satz muss der Nutzer nie mitschreiben; er dient zum Auflösen als
+   Kontext. `list` zeigt beides getrennt an. Nach der Auflösung den
    Nutzer wie im Original-App selbst einschätzen lassen ("nochmal" / "schwer"
    / "gut" / "einfach"), oder bei eindeutig richtiger bzw. falscher Antwort
    direkt automatisch als "gut" bzw. "nochmal" werten - je nachdem, was den
