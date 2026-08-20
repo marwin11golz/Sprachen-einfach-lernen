@@ -283,8 +283,13 @@ export default function VokabelTrainer() {
   // getippt/geprüft wird nur die Antwort, der Beispielsatz ist reiner Kontext beim Aufdecken.
   const frontRaw = current ? (current.type === 'vocab' && flipped ? current.back : current.front) : '';
   const backRaw = current ? (current.type === 'vocab' && flipped ? current.front : current.back) : '';
-  const displayFront = splitAnswer(frontRaw).answer;
-  const { answer: displayBack, example: displayExample } = splitAnswer(backRaw);
+  const frontParts = splitAnswer(frontRaw);
+  const backParts = splitAnswer(backRaw);
+  const displayFront = frontParts.answer;
+  const displayBack = backParts.answer;
+  // Der Beispielsatz gehoert zur Karte, nicht zu einer Seite: beim Umdrehen
+  // steht er auf der Vorderseite und wuerde sonst gar nicht mehr auftauchen.
+  const displayExample = backParts.example || frontParts.example;
 
   const checkWrite = () => {
     if (!current) return;
@@ -918,7 +923,7 @@ export default function VokabelTrainer() {
 
                 <label style={{ fontSize: FONT.sm, color: T.inkSoft, display: 'block', marginBottom: SPACE.sm, fontWeight: 500 }}>Vokabeln</label>
                 <textarea value={addText} onChange={e => setAddText(e.target.value)}
-                  placeholder={'casa = Haus\nperro = Hund\nFusion = Merger | With the merger, a company can become more efficient.'}
+                  placeholder={'casa = Haus\nperro = Hund\ncasa = Haus - Ich benutze ein Haus.'}
                   rows={8}
                   style={{ ...inputStyle, resize: 'vertical', lineHeight: 1.7, fontFamily: "'IBM Plex Mono', monospace", fontSize: FONT.base }} />
 
@@ -930,7 +935,7 @@ export default function VokabelTrainer() {
                   <input ref={vocabFileRef} type="file" accept=".txt,.csv" style={{ display: 'none' }} onChange={e => readFileInto(e, setAddText)} />
                 </div>
                 <div style={{ marginTop: SPACE.lg, fontSize: FONT.sm, color: T.inkSoft, lineHeight: 1.6 }}>
-                  Eine Zeile pro Karte im Format <span className="mono">Wort = Übersetzung</span> (auch Komma oder Semikolon gehen). Optional mit Beispielsatz: <span className="mono">Übersetzung | Beispielsatz</span> – im Tippen-Modus zählt dann nur die Übersetzung vor dem Strich, der Satz dient nur als Kontext beim Aufdecken. Eine hochgeladene .txt/.csv landet erst im Feld – du kannst sie also vorher prüfen.
+                  Eine Zeile pro Karte im Format <span className="mono">Wort = Übersetzung</span> (auch Komma oder Semikolon gehen). Optional mit Beispielsatz: <span className="mono">Übersetzung - Beispielsatz</span> (Bindestrich mit Leerzeichen davor und danach, oder <span className="mono">|</span>). Getippt werden muss dann nur die Übersetzung vor dem Strich – der Satz erscheint beim Aufdecken als Kontext. Eine hochgeladene .txt/.csv landet erst im Feld – du kannst sie also vorher prüfen.
                 </div>
               </div>
             )}
