@@ -28,6 +28,7 @@ function emptyState() {
     activityLocal: {},
     activityRemote: {},
     flipped: false,
+    newCardsPerDay: 20,
     prefsUpdatedAt: null,
     lastUserId: null,
     lastSyncAt: null,
@@ -111,6 +112,10 @@ export function loadLocal() {
     activityLocal: parsed.activityLocal || parsed.activityLog || {},
     activityRemote: parsed.activityRemote || {},
     flipped: typeof parsed.flipped === 'boolean' ? parsed.flipped : false,
+    // Tageslimit fuer neue Karten - bewusst rein lokal, nicht Teil des
+    // Cloud-Prefs-Abgleichs (siehe useVocabStore.js): eine Lerntempo-
+    // Praeferenz, kein Lernfortschritt.
+    newCardsPerDay: Number.isFinite(parsed.newCardsPerDay) ? parsed.newCardsPerDay : 20,
     prefsUpdatedAt: parsed.prefsUpdatedAt || null,
     lastUserId: parsed.lastUserId || null,
     lastSyncAt: parsed.lastSyncAt || null,
@@ -127,6 +132,7 @@ export function saveLocal(state) {
       activityLocal: state.activityLocal,
       activityRemote: state.activityRemote,
       flipped: state.flipped,
+      newCardsPerDay: state.newCardsPerDay ?? 20,
       prefsUpdatedAt: state.prefsUpdatedAt ?? null,
       lastUserId: state.lastUserId ?? null,
       lastSyncAt: state.lastSyncAt ?? null,

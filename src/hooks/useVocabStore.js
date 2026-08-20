@@ -17,6 +17,7 @@ export function useVocabStore() {
   const [activityLocal, setActivityLocal] = useState({});
   const [activityRemote, setActivityRemote] = useState({});
   const [flipped, setFlipped] = useState(false);
+  const [newCardsPerDay, setNewCardsPerDay] = useState(20);
   const [prefsUpdatedAt, setPrefsUpdatedAt] = useState(null);
   const [lastUserId, setLastUserId] = useState(null);
   const [lastSyncAt, setLastSyncAt] = useState(null);
@@ -35,6 +36,7 @@ export function useVocabStore() {
     setActivityLocal(state.activityLocal);
     setActivityRemote(state.activityRemote);
     setFlipped(state.flipped);
+    setNewCardsPerDay(state.newCardsPerDay);
     setPrefsUpdatedAt(state.prefsUpdatedAt);
     setLastUserId(state.lastUserId);
     setLastSyncAt(state.lastSyncAt);
@@ -48,12 +50,12 @@ export function useVocabStore() {
     const t = setTimeout(() => {
       const res = saveLocal({
         cards: allCards, activityLocal, activityRemote,
-        flipped, prefsUpdatedAt, lastUserId, lastSyncAt,
+        flipped, newCardsPerDay, prefsUpdatedAt, lastUserId, lastSyncAt,
       });
       setStorageWarning(res.ok ? null : res.warning);
     }, 300);
     return () => clearTimeout(t);
-  }, [allCards, activityLocal, activityRemote, flipped, prefsUpdatedAt, lastUserId, lastSyncAt, loaded]);
+  }, [allCards, activityLocal, activityRemote, flipped, newCardsPerDay, prefsUpdatedAt, lastUserId, lastSyncAt, loaded]);
 
   // Immer der zuletzt festgeschriebene Stand - damit rateCard die aktuelle
   // Karte bewertet und nicht eine veraltete Momentaufnahme aus der Warteschlange.
@@ -132,6 +134,7 @@ export function useVocabStore() {
   return {
     cards, allCards, activity, activityLocal,
     flipped, setFlipped: setFlippedTracked,
+    newCardsPerDay, setNewCardsPerDay,
     prefsUpdatedAt, lastUserId, lastSyncAt,
     loaded, storageWarning,
     revision,

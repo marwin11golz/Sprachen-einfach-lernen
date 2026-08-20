@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Kommandozeilen-Werkzeug fuer den Spanischcoach.
-// Implementiert dieselbe SM-2-aehnliche Bewertungslogik wie src/lib/srs.js
+// Implementiert dieselbe FSRS-Bewertungslogik wie src/lib/srs.js + src/lib/fsrs.js
 // ("Sprachen lernen"), damit Karten aus der Chat-Skill und aus der
 // Web-App austauschbar bleiben (gleiches JSON-Format, gleiche Formeln).
 //
@@ -60,49 +60,119 @@ function migrateCard(c) {
     card.updatedAt = `${day}T00:00:00.000Z`;
   }
   if (typeof card.deleted !== 'boolean') card.deleted = false;
+  if (card.stability === undefined) card.stability = null;
+  if (card.difficulty === undefined) card.difficulty = null;
   return card;
 }
 
 const todayISO = () => new Date().toISOString().slice(0, 10);
 const uid = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
 
+// ---------- FSRS-6 (vereinfacht) - Kopie von src/lib/fsrs.js ----------
+// Identisch zu den Formeln dort - bewusst dupliziert statt importiert, damit
+// die Skill ohne Build-Schritt als reines Node-Script laeuft und
+// unabhaengig von der React-App bleibt. Aenderungen dort mitziehen.
+const W = [
+  0.212, 1.2931, 2.3065, 8.2956, 6.4133, 0.8334, 3.0194, 0.001, 1.8722, 0.1666,
+  0.796, 1.4835, 0.0614, 0.2629, 1.6483, 0.6014, 1.8729, 0.5425, 0.0912, 0.0658, 0.1542,
+];
+const FSRS_DECAY = -W[20];
+const FSRS_FACTOR = Math.pow(0.9, 1 / FSRS_DECAY) - 1;
+const STABILITY_MIN = 0.001;
+const DESIRED_RETENTION = 0.9;
+const MAX_INTERVAL = 36500;
+const RATING = { again: 1, hard: 2, good: 3, easy: 4 };
+const clampDifficulty = (d) => Math.min(10, Math.max(1, d));
+
+function initialStability(r) { return Math.max(W[r - 1], STABILITY_MIN); }
+function initialDifficulty(r) { return clampDifficulty(W[4] - Math.exp(W[5] * (r - 1)) + 1); }
+function nextDifficulty(D, r) {
+  const deltaD = -(W[6] * (r - 3));
+  const damped = D + ((10 - D) * deltaD) / 9;
+  const easyD0 = W[4] - Math.exp(W[5] * 3) + 1;
+  return clampDifficulty(W[7] * easyD0 + (1 - W[7]) * damped);
+}
+function retrievability(t, S) { return Math.pow(1 + (FSRS_FACTOR * t) / S, FSRS_DECAY); }
+function nextStabilityRecall(D, S, R, r) {
+  const hardPenalty = r === RATING.hard ? W[15] : 1;
+  const easyBonus = r === RATING.easy ? W[16] : 1;
+  const grown = S * (
+    1 + Math.exp(W[8]) * (11 - D) * Math.pow(S, -W[9]) * (Math.exp((1 - R) * W[10]) - 1) * hardPenalty * easyBonus
+  );
+  return Math.max(grown, STABILITY_MIN);
+}
+function nextStabilityForget(D, S, R) {
+  const longTerm = W[11] * Math.pow(D, -W[12]) * (Math.pow(S + 1, W[13]) - 1) * Math.exp((1 - R) * W[14]);
+  const shortTerm = S / Math.exp(W[17] * W[18]);
+  return Math.max(Math.min(longTerm, shortTerm), STABILITY_MIN);
+}
+function shortTermStability(S, r) {
+  let inc = Math.exp(W[17] * (r - 3 + W[18])) * Math.pow(S, -W[19]);
+  if (r !== RATING.again) inc = Math.max(inc, 1.0);
+  return Math.max(S * inc, STABILITY_MIN);
+}
+function nextInterval(S) {
+  const raw = (S / FSRS_FACTOR) * (Math.pow(DESIRED_RETENTION, 1 / FSRS_DECAY) - 1);
+  return Math.min(MAX_INTERVAL, Math.max(1, Math.round(raw)));
+}
+
+// Einmaliges Impfen von stability/difficulty fuer Karten aus der Zeit vor
+// FSRS - siehe seedFromLegacy() in src/lib/srs.js fuer die Begruendung.
+function seedFromLegacy(card) {
+  const interval = card.interval > 0 ? card.interval : 0.5;
+  const ease = Math.min(3.0, Math.max(1.3, card.ease ?? 2.5));
+  const difficulty = Math.min(10, Math.max(1, 1 + ((3.0 - ease) / 1.7) * 9));
+  return { stability: Math.max(interval, STABILITY_MIN), difficulty };
+}
+
 // Identisch zur rate()-Funktion in src/lib/srs.js - bewusst dupliziert statt
 // importiert, damit die Skill ohne Build-Schritt als reines Node-Script
 // laeuft und unabhaengig von der React-App bleibt.
 function rate(card, rating) {
   const c = { ...card };
+  const r = RATING[rating];
+  if (!r) throw new Error(`Unbekanntes Rating: ${rating}`);
   const today = new Date();
   const iso = (d) => d.toISOString().slice(0, 10);
 
-  if (rating === 'again') {
-    c.ease = Math.max(1.3, c.ease - 0.2);
-    c.repetitions = 0;
-    c.interval = 0;
-    c.dueDate = iso(today);
-    c.wrong += 1;
-  } else {
-    c.correct += 1;
-    if (rating === 'hard') {
-      c.ease = Math.max(1.3, c.ease - 0.15);
-      c.interval = Math.max(1, Math.round((c.interval || 1) * 1.2));
-    } else if (rating === 'good') {
-      c.repetitions += 1;
-      if (c.repetitions === 1) c.interval = 1;
-      else if (c.repetitions === 2) c.interval = 6;
-      else c.interval = Math.round(c.interval * c.ease);
-    } else if (rating === 'easy') {
-      c.ease = Math.min(3.0, c.ease + 0.15);
-      c.repetitions += 1;
-      c.interval = Math.round((c.interval || 1) * c.ease * 1.3) + 1;
-    } else {
-      throw new Error(`Unbekanntes Rating: ${rating}`);
-    }
-    const due = new Date(today);
-    due.setDate(due.getDate() + c.interval);
-    c.dueDate = iso(due);
+  if (c.stability == null && c.totalReviews > 0) {
+    const seeded = seedFromLegacy(c);
+    c.stability = seeded.stability;
+    c.difficulty = seeded.difficulty;
   }
-  c.lastReviewed = iso(today);
+
+  if (c.stability == null) {
+    c.stability = initialStability(r);
+    c.difficulty = initialDifficulty(r);
+  } else {
+    const elapsed = c.lastReviewed
+      ? Math.max(0, Math.round((today - new Date(`${c.lastReviewed}T00:00:00.000Z`)) / 86400000))
+      : 0;
+    const difficulty = nextDifficulty(c.difficulty, r);
+    let stability;
+    if (elapsed === 0) {
+      stability = shortTermStability(c.stability, r);
+    } else {
+      const R = retrievability(elapsed, c.stability);
+      stability = rating === 'again'
+        ? nextStabilityForget(c.difficulty, c.stability, R)
+        : nextStabilityRecall(c.difficulty, c.stability, R, r);
+    }
+    c.stability = stability;
+    c.difficulty = difficulty;
+  }
+
+  c.interval = nextInterval(c.stability);
+  const due = new Date(today);
+  due.setDate(due.getDate() + c.interval);
+  c.dueDate = iso(due);
+
+  c.repetitions = (c.totalReviews || 0) + 1;
   c.totalReviews = (c.totalReviews || 0) + 1;
+  if (rating === 'again') c.wrong += 1; else c.correct += 1;
+  c.ease = Math.round((1.3 + ((10 - c.difficulty) / 9) * 1.7) * 100) / 100;
+
+  c.lastReviewed = iso(today);
   c.updatedAt = new Date().toISOString();
   return c;
 }
@@ -111,6 +181,7 @@ function newCard(fields) {
   return {
     id: uid(),
     ease: 2.5, interval: 0, repetitions: 0, dueDate: todayISO(),
+    stability: null, difficulty: null,
     createdAt: todayISO(), lastReviewed: null, totalReviews: 0, correct: 0, wrong: 0,
     updatedAt: new Date().toISOString(), deleted: false,
     ...fields,

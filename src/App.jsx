@@ -26,6 +26,7 @@ export default function VokabelTrainer() {
   const {
     cards, allCards, activity,
     flipped, setFlipped,
+    newCardsPerDay, setNewCardsPerDay,
     loaded, storageWarning,
     addCards, rateCard, deleteCard, importData,
   } = store;
@@ -128,6 +129,14 @@ export default function VokabelTrainer() {
   // --- Stats ---
   const dueCards = useMemo(() => cards.filter(c => c.dueDate <= todayISO()), [cards]);
   const newCardsCount = useMemo(() => dueCards.filter(c => c.repetitions === 0).length, [dueCards]);
+  // Neue Karten, die HEUTE schon zum ersten Mal bewertet wurden - aus den
+  // Karten abgeleitet statt in einem eigenen Zaehler mitgefuehrt, damit
+  // mehrere Sitzungen am selben Tag und ein Cloud-Abgleich dazwischen den
+  // Zaehler nicht verfaelschen koennen.
+  const newIntroducedToday = useMemo(
+    () => cards.filter(c => c.totalReviews === 1 && c.lastReviewed === todayISO()).length,
+    [cards],
+  );
   const reviewCount = dueCards.length - newCardsCount;
   const learnedCount = cards.filter(c => c.repetitions > 0).length;
   const totalReviewsAll = cards.reduce((s, c) => s + (c.totalReviews || 0), 0);
@@ -181,9 +190,23 @@ export default function VokabelTrainer() {
   // --- Study-Session ---
   const startStudy = (key, label, onlyDue = true) => {
     const source = onlyDue ? dueCards : cards;
-    const pool = key ? source.filter(c => deckKeyOf(c) === key) : source;
+    let pool = key ? source.filter(c => deckKeyOf(c) === key) : source;
+    let limitHit = false;
+    // Tageslimit fuer neue Karten: nur beim normalen Faellig-Lernen, nicht
+    // bei "Alle wiederholen" - das soll bewusst alles zeigen. Wiederholungen
+    // bereits gelernter Karten sind nie gedeckelt.
+    if (onlyDue) {
+      const reviewPool = pool.filter(c => c.repetitions > 0);
+      const newPool = pool.filter(c => c.repetitions === 0)
+        .slice().sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+      const allowance = Math.max(0, newCardsPerDay - newIntroducedToday);
+      limitHit = newPool.length > allowance && reviewPool.length === 0;
+      pool = [...reviewPool, ...newPool.slice(0, allowance)];
+    }
     if (pool.length === 0) {
-      showToast(onlyDue ? 'Keine fälligen Karten in diesem Bereich – gut gemacht!' : 'Keine Karten in diesem Bereich vorhanden.');
+      showToast(limitHit
+        ? `Tageslimit erreicht (${newCardsPerDay} neue Karten) – wiederholte Karten gibt's gerade keine. Morgen geht's weiter.`
+        : onlyDue ? 'Keine fälligen Karten in diesem Bereich – gut gemacht!' : 'Keine Karten in diesem Bereich vorhanden.');
       return;
     }
     setDeckFilter(key); setDeckLabel(label || null);
@@ -448,6 +471,18 @@ export default function VokabelTrainer() {
                       Alle fälligen lernen
                     </button>
                   </div>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14, fontSize: 12.5, color: T.inkSoft, flexWrap: 'wrap' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    Neue Karten/Tag:
+                    <input
+                      type="number" min={0} value={newCardsPerDay}
+                      onChange={e => setNewCardsPerDay(Math.max(0, Number(e.target.value) || 0))}
+                      style={{ width: 56, padding: '4px 6px', borderRadius: 6, border: `1px solid ${T.border}`, background: T.bgElev, color: T.ink, fontSize: 12.5 }}
+                    />
+                  </label>
+                  <span>·</span>
+                  <span>heute {newIntroducedToday} eingeführt</span>
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                   {decks.map(d => {

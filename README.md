@@ -1,6 +1,6 @@
 # Sprachen lernen
 
-Vokabeltrainer mit Spaced Repetition (SM-2), Lückensätzen für Konjugationen und Dashboard.
+Vokabeltrainer mit Spaced Repetition (FSRS), Lückensätzen für Konjugationen und Dashboard.
 
 ## Lokal ausführen
 ```bash
