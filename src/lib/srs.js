@@ -166,15 +166,43 @@ export function newGapCard({ sentence, answer, language }) {
   };
 }
 
+// ---------- Sprachen ----------
+// Der Code (BCP-47) ist das, woran die Sprachausgabe die Stimme waehlt. Ohne
+// ihn liest der Browser jeden Text mit der Standardstimme vor - "future"
+// klingt dann deutsch. Die Namen sind zugleich die Werte, die in langA/langB
+// bzw. language auf der Karte landen; sie duerfen deshalb nicht umbenannt
+// werden, sonst finden bestehende Karten ihre Sprache nicht mehr.
+export const LANGUAGES = [
+  { name: 'Spanisch', code: 'es-ES' },
+  { name: 'Englisch', code: 'en-US' },
+  { name: 'Französisch', code: 'fr-FR' },
+  { name: 'Italienisch', code: 'it-IT' },
+  { name: 'Portugiesisch', code: 'pt-PT' },
+  { name: 'Niederländisch', code: 'nl-NL' },
+  { name: 'Türkisch', code: 'tr-TR' },
+  { name: 'Polnisch', code: 'pl-PL' },
+  { name: 'Russisch', code: 'ru-RU' },
+  { name: 'Arabisch', code: 'ar-SA' },
+  { name: 'Japanisch', code: 'ja-JP' },
+  { name: 'Koreanisch', code: 'ko-KR' },
+  { name: 'Chinesisch', code: 'zh-CN' },
+  { name: 'Deutsch', code: 'de-DE' },
+];
+
+// null fuer "Sonstige"/unbekannt - dann bleibt es bei der Standardstimme,
+// was ehrlicher ist als eine geratene Sprache.
+export function langCodeOf(name) {
+  const hit = LANGUAGES.find(l => l.name === name);
+  return hit ? hit.code : null;
+}
+
 // ---------- Auswahllisten ----------
+const FOREIGN = LANGUAGES.filter(l => l.name !== 'Deutsch');
+
 export const VOCAB_PAIRS = [
-  { label: 'Spanisch → Deutsch', a: 'Spanisch', b: 'Deutsch' },
-  { label: 'Deutsch → Spanisch', a: 'Deutsch', b: 'Spanisch' },
-  { label: 'Englisch → Deutsch', a: 'Englisch', b: 'Deutsch' },
-  { label: 'Deutsch → Englisch', a: 'Deutsch', b: 'Englisch' },
-  { label: 'Japanisch → Deutsch', a: 'Japanisch', b: 'Deutsch' },
-  { label: 'Französisch → Deutsch', a: 'Französisch', b: 'Deutsch' },
+  ...FOREIGN.map(l => ({ label: `${l.name} → Deutsch`, a: l.name, b: 'Deutsch' })),
+  ...FOREIGN.map(l => ({ label: `Deutsch → ${l.name}`, a: 'Deutsch', b: l.name })),
   { label: 'Sonstige', a: 'Sprache 1', b: 'Sprache 2' },
 ];
 
-export const SENTENCE_LANGS = ['Spanisch', 'Englisch', 'Französisch', 'Deutsch', 'Japanisch', 'Sonstige'];
+export const SENTENCE_LANGS = [...LANGUAGES.map(l => l.name), 'Sonstige'];
