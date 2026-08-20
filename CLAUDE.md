@@ -15,7 +15,7 @@ There is no lint, format, or test tooling configured in this repo — no ESLint/
 
 ## Architecture
 
-This is a single-page Vite + React app, "Lucy lernt Sprachen" — a flashcard-based vocabulary trainer with spaced repetition. It intentionally has no router and no state-management library. Data is local-first (`localStorage`), with cloud sync as an optional layer on top.
+This is a single-page Vite + React app, "Sprachen lernen" — a flashcard-based vocabulary trainer with spaced repetition. It intentionally has no router and no state-management library. Data is local-first (`localStorage`), with cloud sync as an optional layer on top.
 
 ### Module layout
 
