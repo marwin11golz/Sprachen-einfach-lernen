@@ -83,6 +83,17 @@ export function rate(card, rating) {
   return c;
 }
 
+// ---------- Übersetzung mit optionalem Beispielsatz ----------
+// "Merger | With the merger, a company can become more efficient." - beim
+// Tippen zaehlt nur der Teil vor dem Strich, der Beispielsatz dient nur als
+// Kontext beim Aufdecken. Ohne "|" wird der ganze Text als Antwort gewertet -
+// bestehende Karten ohne Beispielsatz sind also unveraendert.
+export function splitAnswer(text) {
+  const i = text.indexOf('|');
+  if (i === -1) return { answer: text.trim(), example: null };
+  return { answer: text.slice(0, i).trim(), example: text.slice(i + 1).trim() };
+}
+
 // Tippfehler-Toleranz beim Abfragen getippter Antworten.
 export function levenshtein(a, b) {
   a = a.trim().toLowerCase(); b = b.trim().toLowerCase();
