@@ -12,8 +12,8 @@ export function hexToRgba(hex, alpha) {
 // Feste Stufen statt Ad-hoc-Werten - macht Abstand/Rundung/Schriftgröße
 // überall im Code vorhersehbar statt an jeder Stelle neu erfunden.
 export const SPACE = { xs: 4, sm: 8, md: 12, lg: 16, xl: 24, xxl: 32 };
-export const RADIUS = { sm: 6, md: 10, lg: 16, pill: 999 };
-export const FONT = { xs: 11, sm: 12, base: 13, md: 14, lg: 16, xl: 20, xxl: 26, hero: 44 };
+export const RADIUS = { sm: 6, md: 8, lg: 12, pill: 999 };
+export const FONT = { xs: 11, sm: 12, base: 13, md: 14, lg: 16, xl: 18, xxl: 22, hero: 32 };
 
 // Platzbedarf der schwebenden unteren Navigation (Pillenhoehe + Abstand zum
 // Bildschirmrand). Der Inhalt braucht unten genau so viel Luft, damit die
@@ -31,9 +31,9 @@ export const THEMES = {
     danger: '#B23A4B', dangerSoft: '#FBE6E9',
     success: '#1F8A5F', successSoft: '#E2F3EA',
     heatEmpty: '#E7EBE5',
-    shadow: '0 1px 2px rgba(18,28,22,.05)',
+    shadow: '0 1px 3px rgba(18,28,22,.06)',
     // Erhabene Flaechen, die sich vom Untergrund abheben sollen (Hero, Lernkarte).
-    shadowLift: '0 2px 4px rgba(18,28,22,.05), 0 12px 32px rgba(18,28,22,.08)',
+    shadowLift: '0 2px 6px rgba(18,28,22,.08)',
   },
   dark: {
     bg: '#0D110F', bgElev: '#161C19', ink: '#ECEFEA', inkSoft: '#8F9992',
@@ -46,8 +46,8 @@ export const THEMES = {
     danger: '#E68C98', dangerSoft: '#37191E',
     success: '#4FC792', successSoft: '#102A1F',
     heatEmpty: '#1C231E',
-    shadow: '0 1px 2px rgba(0,0,0,.4)',
-    shadowLift: '0 2px 4px rgba(0,0,0,.4), 0 12px 32px rgba(0,0,0,.45)',
+    shadow: '0 1px 3px rgba(0,0,0,.2)',
+    shadowLift: '0 2px 6px rgba(0,0,0,.25)',
   },
 };
 
@@ -98,5 +98,64 @@ export function surface(T, { lift = false } = {}) {
   return {
     background: T.bgElev, border: `1px solid ${T.border}`, borderRadius: RADIUS.lg,
     boxShadow: lift ? T.shadowLift : T.shadow,
+  };
+}
+
+// ---------- Typography System ----------
+// Konsistente Hierarchie für alle UI-Elemente: Display, H1, H2, Body, Secondary, Caption
+// Ohne diese Funktionen: keine Exceptions mehr, immer über diese Utilities
+
+export function typoDisplay() {
+  return {
+    fontSize: FONT.hero,
+    fontWeight: 600,
+    lineHeight: 1.2,
+    letterSpacing: '-0.02em',
+  };
+}
+
+export function typoH1() {
+  return {
+    fontSize: FONT.xxl,
+    fontWeight: 600,
+    lineHeight: 1.25,
+    letterSpacing: '-0.01em',
+  };
+}
+
+export function typoH2() {
+  return {
+    fontSize: FONT.xl,
+    fontWeight: 600,
+    lineHeight: 1.3,
+    letterSpacing: '-0.01em',
+  };
+}
+
+export function typoBody(size = 'md') {
+  const lineHeight = size === 'lg' ? 1.6 : 1.5;
+  return {
+    fontSize: FONT[size],
+    fontWeight: 400,
+    lineHeight,
+    letterSpacing: 0,
+  };
+}
+
+export function typoSecondary(size = 'base') {
+  return {
+    fontSize: FONT[size],
+    fontWeight: 500,
+    lineHeight: 1.4,
+    letterSpacing: 0,
+  };
+}
+
+export function typoCaption() {
+  return {
+    fontSize: FONT.xs,
+    fontWeight: 500,
+    lineHeight: 1.2,
+    letterSpacing: 0,
   };
 }

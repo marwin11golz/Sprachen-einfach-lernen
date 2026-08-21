@@ -36,7 +36,7 @@ The data layer is deliberately separated from the UI so that database work and d
 
 **UI**
 
-- **`src/lib/theme.js`** — the design system: `SPACE`/`RADIUS`/`FONT`/`NAVBAR_H` scales, `THEMES` (light/dark palettes), and the style helpers `btnPrimary`/`btnSecondary`/`btnGhost` (each with `sm`/`md`/`lg` sizes), `ratingBtn`, `surface`. Inline styles throughout; no CSS framework. Reach for these tokens rather than fresh magic numbers — the whole point is that spacing/radius/type stay predictable.
+- **`src/lib/theme.js`** — the design system: `SPACE`/`RADIUS`/`FONT`/`NAVBAR_H` scales, `THEMES` (light/dark palettes), and the style helpers `btnPrimary`/`btnSecondary`/`btnGhost` (each with `sm`/`md`/`lg` sizes), `ratingBtn`, `surface`. Inline styles throughout; no CSS framework. **All hardcoded spacing/radius/font values have been removed.** Reach for these tokens rather than fresh magic numbers — spacing: `{ xs:4, sm:8, md:12, lg:16, xl:24, xxl:32 }`, radius: `{ sm:6, md:8, lg:12, pill:999 }`, font: `{ xs:11, sm:12, base:13, md:14, lg:16, xl:18, xxl:22, hero:32 }`. This discipline ensures visual consistency across all changes.
 - **`src/hooks/useVocabStore.js`** — owns `cards`, activity, `flipped`, `newCardsPerDay`, persistence. Exposes **only intent-based actions** (`addCards`, `rateCard`, `deleteCard`, `importData`), never a raw `setCards` — that is what guarantees every mutation stamps `updatedAt`.
 - **`src/App.jsx`** — all UI. Views are toggled by a single `view` state: `dashboard` / `add` / `browse` / `account` render as conditional blocks inside the main return, but **`study` returns early as its own full-screen layer** (before the header and bottom nav) so the learning session has no surrounding chrome. Two top-level `return`s, not one.
 - **`src/ui/AuthScreen.jsx`**, **`src/ui/SyncBadge.jsx`** — the only extracted components.
@@ -58,6 +58,10 @@ The data layer is deliberately separated from the UI so that database work and d
 - **A `|` or a spaced dash in a card's back splits answer from example sentence** (`splitAnswer()`). Only the part before the separator is typed and checked; the rest is context shown on reveal. The dash *must* be surrounded by spaces so `E-Mail` and `well-known` survive, and en/em dashes count because phone keyboards autocorrect `" - "` into `" – "`. The example belongs to the card, not to a side — when `flipped`, it sits on the front, so the UI falls back to `frontParts.example`.
 - **Language names in `LANGUAGES` are persisted card data** (`langA`/`langB`/`language`). Renaming an entry orphans existing cards' language; adding entries is safe. Each carries a BCP-47 `code` used for speech — without it the browser reads every word in the default voice, so English "future" comes out German.
 
+### Design aesthetic: Anki-style
+
+The app's visual design targets a professional, utilitarian look (inspired by Anki) rather than decorative/playful. Changes prioritize clarity and efficiency: smaller radius, flatter shadows, tighter spacing, smaller font scale. This is enforced through the design token system — no hardcoding. When styling a new component, use `SPACE`/`RADIUS`/`FONT`/`THEMES` tokens exclusively. If a value doesn't fit the scales, it means the component needs rethinking, not a new magic number.
+
 ### UI gotchas
 
 - **Nav visibility is driven purely by CSS media queries** (`.nav-top-links` / `.nav-bottom` in the `globalCss` template string). Top nav on wide screens, floating bottom pill on phones. Putting an inline `display` on either element silently defeats the breakpoint and shows **both** navigations at once — this has already happened once.
@@ -69,7 +73,7 @@ The data layer is deliberately separated from the UI so that database work and d
 A skill that lets Claude act as a chat-based Spanish coach, sharing the app's data model and FSRS formulas so cards are interchangeable between the app and chat sessions.
 
 - `scripts/vocab.js` — dependency-free Node ESM CLI (`add-vocab`, `add-gap`, `due`, `rate`, `stats`, `list`) reading/writing `data/spanischcoach/vocab.json` in the same shape as the app's JSON export. Ratings should always go through this script rather than being computed by hand, so results stay bit-for-bit consistent with `rate()`.
-- **`rate()`, the FSRS formulas, the card shape, and `splitAnswer()` are duplicated (not imported) here** so the script runs without a build step — **changes to any of those must be mirrored into `vocab.js`.** `splitAnswer()` is part of the obligation because it decides what counts as a correct answer: if the two sides disagree, something the app accepts would be marked wrong in chat. UI-only concerns (theme, view logic, the language picker lists) are not.
+- **`rate()`, the FSRS formulas, the card shape, and `splitAnswer()` are duplicated (not imported) here** so the script runs without a build step — **changes to any of those must be mirrored into `vocab.js`.** `splitAnswer()` is critical because it defines what counts as a correct answer: if the two sides disagree on the answer/example separator, something the app accepts would be marked wrong in chat, and vice versa. When adding separator patterns to `splitAnswer()` in `srs.js`, always update the regex in both files identically. UI-only concerns (theme, view logic, the language picker lists) are not.
 - The app's "Karten → Export/Import" is the bridge between `localStorage` (browser) and `data/spanischcoach/vocab.json` (repo/chat), and remains the only way to move cards without signing in.
 
 ## Language
