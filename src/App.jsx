@@ -14,6 +14,7 @@ import {
 import {
   THEMES, hexToRgba, SPACE, RADIUS, FONT, NAVBAR_H,
   btnPrimary, btnSecondary, btnGhost, ratingBtn, surface,
+  typoDisplay, typoH1, typoH2, typoBody, typoSecondary, typoCaption,
 } from './lib/theme.js';
 import { useVocabStore } from './hooks/useVocabStore.js';
 import { useAuth } from './hooks/useAuth.js';
