@@ -122,11 +122,14 @@ export function btnGhost(T, size = 'md') {
     fontSize: size === 'sm' ? FONT.xs : FONT.sm,
   };
 }
+// Symbol oben, Beschriftung darunter. Das Symbol traegt die Bewertung mit, damit
+// sie nicht allein an der Farbe haengt.
 export function ratingBtn(color, bg) {
   return {
-    background: bg, color, border: 'none', borderRadius: RADIUS.md, padding: '14px 4px',
+    background: bg, color, borderRadius: RADIUS.lg, padding: `${SPACE.md}px ${SPACE.xs}px`,
     fontSize: FONT.md, fontWeight: 600, cursor: 'pointer', display: 'flex',
-    flexDirection: 'column', alignItems: 'center', gap: 3, transition: 'transform .1s',
+    flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+    gap: SPACE.xs, transition: 'transform .1s',
   };
 }
 

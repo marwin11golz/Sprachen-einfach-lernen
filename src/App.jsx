@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   Plus, Search, BarChart3, Layers, CheckCircle2, XCircle, Sun, Moon, X,
   Download, Trash2, Volume2, Upload, BookOpen, PenLine, ChevronRight, Repeat, Flame,
+  MinusCircle, Star, Pointer, Quote,
 } from 'lucide-react';
 
 import {
@@ -329,6 +330,9 @@ export default function VokabelTrainer() {
   };
 
   const isWriteInteraction = current && (current.type === 'gap' || studyMode === 'write');
+  // Nur im Aufdeck-Modus laesst sich die Karte antippen; wo getippt wird, deckt
+  // erst das Pruefen auf, sonst waere die Eingabe umgehbar.
+  const canTapToReveal = current && !isWriteInteraction && !revealed;
 
   // Tastatursteuerung
   useEffect(() => {
@@ -448,6 +452,22 @@ export default function VokabelTrainer() {
     fontSize: FONT.md, outline: 'none',
   };
 
+  // Kleine Pille fuer beilaeufige Angaben auf einer Karte (Sprachrichtung,
+  // "Beispielsatz"). Sitzt auf der erhabenen Flaeche, deshalb eine Stufe darunter.
+  const chipStyle = {
+    display: 'inline-flex', alignItems: 'center', gap: SPACE.xs,
+    background: T.surface, color: T.textSecondary,
+    padding: `${SPACE.xs}px ${SPACE.md}px`, borderRadius: RADIUS.pill,
+    ...typoCaption(),
+  };
+  // Runder Knopf fuer das Vorlesen - als Flaeche erkennbar, nicht als loses Symbol.
+  const roundIconBtn = {
+    width: 40, height: 40, borderRadius: RADIUS.pill, border: 'none',
+    background: T.surface, color: T.textSecondary, cursor: 'pointer',
+    display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+    marginTop: SPACE.md,
+  };
+
   const globalCss = `
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
     * { box-sizing: border-box; }
@@ -519,20 +539,26 @@ export default function VokabelTrainer() {
       }}>
         <style>{globalCss}</style>
 
-        {/* Kopfzeile: schliessen, Fortschritt, Zaehler */}
+        {/* Kopfzeile: Zaehler mittig, Fortschritt als eigene Zeile darunter ueber
+            die volle Breite - so bleibt der Stand ablesbar, ohne die Zeile zu
+            teilen. Der Schliessen-Knopf steht fuer sich links. */}
         <div style={{
-          padding: `calc(${SPACE.md}px + env(safe-area-inset-top)) ${SPACE.lg}px ${SPACE.md}px`,
-          display: 'flex', alignItems: 'center', gap: SPACE.md, flexShrink: 0,
+          padding: `calc(${SPACE.md}px + env(safe-area-inset-top)) ${SPACE.lg}px 0`,
+          flexShrink: 0,
         }}>
-          <button className="press" onClick={() => setView('dashboard')} aria-label="Lernen beenden"
-            style={{ background: 'none', border: 'none', cursor: 'pointer', color: T.textSecondary, padding: 4, display: 'flex' }}>
-            <X size={22} />
-          </button>
-          <div style={{ flex: 1, height: 6, borderRadius: RADIUS.pill, background: T.border, overflow: 'hidden' }}>
-            <div style={{ height: '100%', width: `${sessionProgress}%`, background: T.primary, borderRadius: RADIUS.pill, transition: 'width .3s ease' }} />
+          <div style={{ display: 'flex', alignItems: 'center', marginBottom: SPACE.md }}>
+            <button className="press" onClick={() => setView('dashboard')} aria-label="Lernen beenden"
+              style={{ background: 'none', border: 'none', cursor: 'pointer', color: T.textSecondary, padding: 4, display: 'flex' }}>
+              <X size={22} />
+            </button>
+            <div style={{ flex: 1, textAlign: 'center', ...typoSecondary('lg'), color: T.textPrimary }}>
+              {Math.min(sessionDone + 1, sessionTotal)} / {sessionTotal}
+            </div>
+            {/* Gleicht den Schliessen-Knopf aus, damit der Zaehler wirklich mittig steht. */}
+            <div style={{ width: 30, flexShrink: 0 }} />
           </div>
-          <div className="mono" style={{ fontSize: FONT.base, color: T.textSecondary, flexShrink: 0 }}>
-            {Math.min(sessionDone + 1, sessionTotal)}/{sessionTotal}
+          <div style={{ height: 5, borderRadius: RADIUS.pill, background: T.surfaceElevated, overflow: 'hidden' }}>
+            <div style={{ height: '100%', width: `${sessionProgress}%`, background: T.primary, borderRadius: RADIUS.pill, transition: 'width .3s ease' }} />
           </div>
         </div>
 
@@ -552,99 +578,127 @@ export default function VokabelTrainer() {
           </div>
         ) : (
           <>
-            {/* Karte */}
-            <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: `0 ${SPACE.lg}px`, minHeight: 0, overflowY: 'auto' }}>
-              <div key={current.id + String(revealed)} className="card-in" style={{
-                ...surface(T, { lift: true }),
-                width: '100%', maxWidth: 520, textAlign: 'center',
-                padding: `${SPACE.xxl}px ${SPACE.xl}px`,
-              }}>
-                <div className="mono" style={{ fontSize: FONT.xs, color: T.textSecondary, letterSpacing: '.08em', textTransform: 'uppercase', marginBottom: SPACE.lg }}>
-                  {current.type === 'gap' ? `Satz · ${current.language}` : `${flipped ? current.langB : current.langA} → ${flipped ? current.langA : current.langB}`}
+            {/* Frage und Antwort sind zwei getrennte Karten. Die Antwort
+                schiebt sich unter die Frage, statt sie zu verdraengen - beim
+                Nachschlagen will man beides nebeneinander sehen. */}
+            <div style={{
+              flex: 1, minHeight: 0, overflowY: 'auto',
+              padding: `${SPACE.lg}px ${SPACE.lg}px ${SPACE.xl}px`,
+              display: 'flex', flexDirection: 'column', alignItems: 'center',
+              justifyContent: 'flex-start', gap: SPACE.lg,
+            }}>
+              {/* --- Frage --- */}
+              <div
+                key={current.id}
+                className="card-in"
+                onClick={canTapToReveal ? () => setRevealed(true) : undefined}
+                role={canTapToReveal ? 'button' : undefined}
+                tabIndex={canTapToReveal ? 0 : undefined}
+                onKeyDown={canTapToReveal
+                  ? e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setRevealed(true); } }
+                  : undefined}
+                style={{
+                  ...surface(T), width: '100%', maxWidth: 520, flexShrink: 0,
+                  textAlign: 'center', padding: `${SPACE.xxl}px ${SPACE.xl}px`,
+                  cursor: canTapToReveal ? 'pointer' : 'default',
+                }}>
+                <div style={chipStyle}>
+                  {current.type === 'gap'
+                    ? `Satz · ${current.language}`
+                    : `${flipped ? current.langB : current.langA} → ${flipped ? current.langA : current.langB}`}
                 </div>
 
-                <div style={{ ...(current.type === 'gap' ? typoH2() : typoDisplay()) }}>
+                <div style={{ ...(current.type === 'gap' ? typoH2() : typoDisplay()), marginTop: SPACE.lg }}>
                   {displayFront}
                 </div>
 
                 {(!isWriteInteraction || revealed) && (
-                  <button className="press"
-                    onClick={() => speak(current.type === 'gap' ? revealSentence(current.sentence) : displayFront, frontLang)}
-                    aria-label={`Vorlesen (${frontLang})`}
-                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: T.textSecondary, marginTop: SPACE.md, padding: 6 }}>
-                    <Volume2 size={20} />
-                  </button>
-                )}
-
-                {!isWriteInteraction && revealed && (
-                  <div className="rise-in" style={{ marginTop: SPACE.xl, paddingTop: SPACE.xl, ...divider(T) }}>
-                    <div style={{ ...typoH2(), color: T.primary }}>{displayBack}</div>
-                    {/* Beim umgedrehten Lernen steht das Fremdwort hier - ohne
-                        eigenen Knopf waere gerade das nicht zu hoeren. */}
-                    <button className="press" onClick={() => speak(displayBack, backLang)}
-                      aria-label={`Antwort vorlesen (${backLang})`}
-                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: T.textSecondary, marginTop: SPACE.sm, padding: 6 }}>
-                      <Volume2 size={18} />
+                  <div>
+                    <button className="press"
+                      onClick={e => { e.stopPropagation(); speak(current.type === 'gap' ? revealSentence(current.sentence) : displayFront, frontLang); }}
+                      aria-label={`Vorlesen (${frontLang})`}
+                      style={roundIconBtn}>
+                      <Volume2 size={19} />
                     </button>
-                    {displayExample && (
-                      <div style={{ ...typoBody(), color: T.textSecondary, marginTop: SPACE.sm }}>{displayExample}</div>
-                    )}
                   </div>
                 )}
 
-                {isWriteInteraction && (
-                  <div style={{ marginTop: SPACE.xl }}>
-                    {!revealed ? (
-                      <div style={{ display: 'flex', gap: SPACE.sm, justifyContent: 'center', flexWrap: 'wrap' }}>
-                        <input autoFocus value={writeInput} onChange={e => setWriteInput(e.target.value)}
-                          onKeyDown={e => e.key === 'Enter' && checkWrite()}
-                          placeholder={current.type === 'gap' ? 'fehlende Form eingeben…' : 'Übersetzung eingeben…'}
-                          style={{ ...inputStyle, flex: 1, minWidth: 200, maxWidth: 300, textAlign: 'center', fontSize: FONT.lg }} />
-                        <button className="press" onClick={checkWrite} style={btnPrimary(T)}>Prüfen</button>
-                      </div>
-                    ) : (
-                      <div className="rise-in">
-                        <div style={{
-                          display: 'inline-flex', alignItems: 'center', gap: SPACE.sm, ...typoSecondary(),
-                          color: writeResult?.ok ? T.success : T.error, background: writeResult?.ok ? T.successSoft : T.errorSoft,
-                          padding: `${SPACE.sm}px ${SPACE.lg}px`, borderRadius: RADIUS.pill,
-                        }}>
-                          {writeResult?.ok ? <CheckCircle2 size={17} /> : <XCircle size={17} />}
-                          {writeResult?.ok ? 'Richtig' : 'Nicht ganz'}
-                        </div>
-                        <div style={{ ...typoH2(), marginTop: SPACE.lg }}>
-                          {current.type === 'gap' ? revealSentence(current.sentence) : displayBack}
-                        </div>
-                        <button className="press"
-                          onClick={() => speak(current.type === 'gap' ? revealSentence(current.sentence) : displayBack, backLang)}
-                          aria-label={`Antwort vorlesen (${backLang})`}
-                          style={{ background: 'none', border: 'none', cursor: 'pointer', color: T.textSecondary, marginTop: SPACE.sm, padding: 6 }}>
-                          <Volume2 size={18} />
-                        </button>
-                        {current.type === 'vocab' && displayExample && (
-                          <div style={{ ...typoBody(), color: T.textSecondary, marginTop: SPACE.sm }}>{displayExample}</div>
-                        )}
-                      </div>
-                    )}
+                {canTapToReveal && (
+                  <div style={{ marginTop: SPACE.lg }}>
+                    <span style={{ ...chipStyle, background: 'none', color: T.textMuted }}>
+                      <Pointer size={14} /> Tippen zum Aufdecken
+                    </span>
+                  </div>
+                )}
+
+                {isWriteInteraction && !revealed && (
+                  <div style={{ display: 'flex', gap: SPACE.sm, justifyContent: 'center', flexWrap: 'wrap', marginTop: SPACE.xl }}>
+                    <input autoFocus value={writeInput} onChange={e => setWriteInput(e.target.value)}
+                      onKeyDown={e => e.key === 'Enter' && checkWrite()}
+                      placeholder={current.type === 'gap' ? 'fehlende Form eingeben…' : 'Übersetzung eingeben…'}
+                      style={{ ...inputStyle, flex: 1, minWidth: 200, maxWidth: 300, textAlign: 'center', fontSize: FONT.lg }} />
+                    <button className="press" onClick={checkWrite} style={btnPrimary(T)}>Prüfen</button>
                   </div>
                 )}
               </div>
+
+              {/* --- Antwort --- */}
+              {revealed && (
+                <div className="rise-in" style={{
+                  ...surface(T), width: '100%', maxWidth: 520, flexShrink: 0,
+                  textAlign: 'center', padding: `${SPACE.xxl}px ${SPACE.xl}px`,
+                  // Der Schimmer kommt aus der Akzentfarbe selbst, kein neuer Ton.
+                  backgroundImage: `linear-gradient(155deg, ${T.primarySoft}, ${T.surfaceElevated} 55%)`,
+                }}>
+                  {isWriteInteraction && (
+                    <div style={{
+                      display: 'inline-flex', alignItems: 'center', gap: SPACE.sm, ...typoSecondary(),
+                      color: writeResult?.ok ? T.success : T.error,
+                      background: writeResult?.ok ? T.successSoft : T.errorSoft,
+                      padding: `${SPACE.sm}px ${SPACE.lg}px`, borderRadius: RADIUS.pill, marginBottom: SPACE.lg,
+                    }}>
+                      {writeResult?.ok ? <CheckCircle2 size={17} /> : <XCircle size={17} />}
+                      {writeResult?.ok ? 'Richtig' : 'Nicht ganz'}
+                    </div>
+                  )}
+
+                  {/* Die Frage steht hier noch einmal - beim Vergleichen will man
+                      nicht zwischen zwei Karten hin und her springen. */}
+                  <div style={{ ...typoSecondary('lg'), color: T.textSecondary }}>{displayFront}</div>
+                  <div style={{ ...typoH2(), marginTop: SPACE.xs }}>
+                    {current.type === 'gap' ? revealSentence(current.sentence) : displayBack}
+                  </div>
+
+                  <div>
+                    <button className="press"
+                      onClick={() => speak(current.type === 'gap' ? revealSentence(current.sentence) : displayBack, backLang)}
+                      aria-label={`Antwort vorlesen (${backLang})`}
+                      style={roundIconBtn}>
+                      <Volume2 size={19} />
+                    </button>
+                  </div>
+
+                  {displayExample && (
+                    <div style={{ marginTop: SPACE.lg, paddingTop: SPACE.lg, ...divider(T) }}>
+                      <div style={chipStyle}><Quote size={12} /> Beispielsatz</div>
+                      <div style={{ ...typoBody('lg'), marginTop: SPACE.md }}>{displayExample}</div>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Aktionsleiste unten - dort, wo der Daumen ohnehin liegt */}
             <div style={{
               flexShrink: 0, padding: `${SPACE.lg}px ${SPACE.lg}px calc(${SPACE.lg}px + env(safe-area-inset-bottom))`,
-              ...divider(T), background: T.background,
+              background: T.background,
             }}>
               <div style={{ maxWidth: 520, margin: '0 auto' }}>
                 {!revealed ? (
                   <>
-                    {!isWriteInteraction && (
-                      <button className="press" onClick={() => setRevealed(true)} style={{ ...btnPrimary(T, 'lg'), width: '100%' }}>
-                        Aufdecken
-                      </button>
-                    )}
-                    <div style={{ display: 'flex', justifyContent: 'center', gap: SPACE.lg, marginTop: SPACE.md }}>
+                    {/* Aufgedeckt wird durch Antippen der Karte - ein eigener Knopf
+                        daneben waere derselbe Befehl ein zweites Mal. */}
+                    <div style={{ display: 'flex', justifyContent: 'center', gap: SPACE.lg }}>
                       {current.type === 'vocab' && (
                         <>
                           <button className="press" onClick={() => setFlipped(f => !f)} style={btnGhost(T)}>
@@ -658,20 +712,26 @@ export default function VokabelTrainer() {
                     </div>
                   </>
                 ) : (
-                  <div className="rise-in" style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: SPACE.sm }}>
-                    {/* Neutrale Kacheln, die Bewertung steckt allein in der Schrift.
-                        Vier getönte Flächen nebeneinander waren die bunteste Stelle
-                        der App - die Farbcodierung bleibt, das Bunte geht. */}
-                    {[
-                      ['again', 'Nochmal', T.error, '1'],
-                      ['hard', 'Schwer', T.warning, '2'],
-                      ['good', 'Gut', T.success, '3'],
-                      ['easy', 'Einfach', T.primary, '4'],
-                    ].map(([key, label, color, num]) => (
-                      <button key={key} className="press" onClick={() => submitRating(key)} style={ratingBtn(color, T.surfaceElevated)}>
-                        {label}<span className="mono" style={{ fontSize: FONT.xs, opacity: .65 }}>{num}</span>
-                      </button>
-                    ))}
+                  <div className="rise-in">
+                    <div style={{ ...typoCaption(), color: T.textMuted, textAlign: 'center', marginBottom: SPACE.md }}>
+                      Wie gut kanntest du es?
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: SPACE.sm }}>
+                      {[
+                        ['again', 'Nochmal', T.error, T.errorSoft, XCircle],
+                        ['hard', 'Schwer', T.warning, T.warningSoft, MinusCircle],
+                        ['good', 'Gut', T.success, T.successSoft, CheckCircle2],
+                        // "Einfach" ist die staerkste Stufe und traegt als einzige
+                        // einen Rand - so ist sie ohne Farbvergleich zu finden.
+                        ['easy', 'Einfach', T.primary, T.primarySoft, Star, true],
+                      ].map(([key, label, color, bg, Icon, outlined]) => (
+                        <button key={key} className="press" onClick={() => submitRating(key)}
+                          style={{ ...ratingBtn(color, bg), border: outlined ? `1px solid ${color}` : '1px solid transparent' }}>
+                          <Icon size={19} />
+                          {label}
+                        </button>
+                      ))}
+                    </div>
                   </div>
                 )}
               </div>
