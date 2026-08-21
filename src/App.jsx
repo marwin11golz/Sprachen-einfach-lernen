@@ -14,7 +14,7 @@ import {
 import {
   THEMES, hexToRgba, SPACE, RADIUS, FONT, NAVBAR_H,
   btnPrimary, btnSecondary, btnGhost, ratingBtn, surface,
-  typoDisplay, typoH1, typoH2, typoBody, typoSecondary, typoCaption,
+  typoDisplay, typoH1, typoH2, typoBody, typoSecondary, typoCaption, typoNumber,
 } from './lib/theme.js';
 import { useVocabStore } from './hooks/useVocabStore.js';
 import { useAuth } from './hooks/useAuth.js';
@@ -543,7 +543,7 @@ export default function VokabelTrainer() {
               <CheckCircle2 size={42} color={T.success} />
             </div>
             <div style={{ ...typoH1(), marginBottom: SPACE.sm }}>Geschafft</div>
-            <div style={{ color: T.inkSoft, marginBottom: SPACE.xl, ...typoBody() }}>
+            <div style={{ color: T.inkSoft, marginBottom: SPACE.xl, maxWidth: 320, ...typoBody() }}>
               {sessionTotal} Karte{sessionTotal !== 1 ? 'n' : ''}{deckLabel ? ` in „${deckLabel}“` : ''} für heute erledigt.
             </div>
             <button className="press" onClick={() => setView('dashboard')} style={btnPrimary(T, 'lg')}>Zum Dashboard</button>
@@ -778,7 +778,7 @@ export default function VokabelTrainer() {
                   percent={dayPercent} track={T.accentSoft} color={T.accent}
                   size={148} stroke={11}
                 >
-                  <div className="mono" style={{ fontSize: FONT.hero, fontWeight: 600, color: dueCards.length > 0 ? T.accent : T.inkSoft }}>
+                  <div className="mono" style={{ ...typoNumber('hero'), color: dueCards.length > 0 ? T.accent : T.inkSoft }}>
                     {dueCards.length}
                   </div>
                   <div style={{ fontSize: FONT.sm, color: T.inkSoft }}>fällig</div>
@@ -824,7 +824,7 @@ export default function VokabelTrainer() {
                     {icon}{label}
                   </div>
                   <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'center', gap: SPACE.xs }}>
-                    <span className="mono" style={{ fontSize: FONT.xxl, fontWeight: 600, color }}>{val}</span>
+                    <span className="mono" style={{ ...typoNumber(), color }}>{val}</span>
                     <span style={{ ...typoCaption(), color: T.inkSoft }}>{unit}</span>
                   </div>
                 </div>
@@ -858,7 +858,7 @@ export default function VokabelTrainer() {
                             {d.type === 'gap' ? <PenLine size={18} color={color} /> : <BookOpen size={18} color={color} />}
                           </div>
                           <div style={{ flex: 1, minWidth: 0 }}>
-                            <div style={{ ...typoH2(), overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: FONT.lg }}>{d.label}</div>
+                            <div style={{ ...typoSecondary('lg'), overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.label}</div>
                             <div className="mono" style={{ fontSize: FONT.xs, color: T.inkSoft, marginTop: 3 }}>
                               {d.learned}/{d.total} gelernt · {d.neu} neu
                             </div>
@@ -887,7 +887,7 @@ export default function VokabelTrainer() {
                   {decks.length === 0 && (
                     <div style={{ ...surface(T), border: `1px dashed ${T.border}`, padding: `${SPACE.xxl}px ${SPACE.lg}px`, textAlign: 'center' }}>
                       <BookOpen size={30} color={T.inkSoft} style={{ marginBottom: SPACE.md, opacity: .6 }} />
-                      <div style={{ ...typoH2() }}>Noch keine Karten</div>
+                      <div style={{ ...typoH2(), marginBottom: SPACE.xs }}>Noch keine Karten</div>
                       <div style={{ color: T.inkSoft, ...typoBody(), marginBottom: SPACE.lg }}>
                         Leg deine ersten Vokabeln an – eine Zeile pro Wort.
                       </div>
@@ -918,7 +918,7 @@ export default function VokabelTrainer() {
                 <div style={{ ...typoH2(), marginBottom: SPACE.md }}>Aktivität</div>
                 <div style={{ ...surface(T), padding: SPACE.lg }}>
                   <div style={{ display: 'flex', alignItems: 'baseline', gap: SPACE.sm, marginBottom: SPACE.xs }}>
-                    <span className="mono" style={{ fontSize: FONT.xxl, fontWeight: 600, color: T.accent }}>
+                    <span className="mono" style={{ ...typoNumber(), color: T.accent }}>
                       {heatmap.weeks.flat().reduce((s, d) => s + d.count, 0)}
                     </span>
                     <span style={{ ...typoCaption(), color: T.inkSoft }}>Wiederholungen</span>
@@ -1090,7 +1090,7 @@ export default function VokabelTrainer() {
                     {c.type === 'gap' ? (
                       <div style={{ ...typoSecondary(), overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{revealSentence(c.sentence)}</div>
                     ) : (
-                      <div style={{ ...typoSecondary() }}>{c.front} <span style={{ color: T.inkSoft, fontWeight: 400 }}>→</span> {splitAnswer(c.back).answer}</div>
+                      <div style={{ ...typoSecondary() }}>{c.front} <span style={{ ...typoBody(), color: T.inkSoft }}>→</span> {splitAnswer(c.back).answer}</div>
                     )}
                     <div className="mono" style={{ fontSize: FONT.xs, color: T.inkSoft, marginTop: 3 }}>
                       {c.type === 'gap' ? `Satz · ${c.language}` : `${c.langA} → ${c.langB}`} · fällig {c.dueDate} · {c.totalReviews || 0}×
@@ -1130,7 +1130,7 @@ export default function VokabelTrainer() {
                   display: 'flex', alignItems: 'center', gap: SPACE.xs, padding: `${SPACE.sm}px ${SPACE.md}px`,
                   borderRadius: RADIUS.pill, border: 'none', cursor: 'pointer', whiteSpace: 'nowrap',
                   background: active ? T.accentSoft : 'transparent',
-                  color: active ? T.accent : T.inkSoft, fontSize: FONT.sm, fontWeight: active ? 600 : 500,
+                  color: active ? T.accent : T.inkSoft, ...typoSecondary('sm'),
                   transition: 'background .15s, color .15s',
                 }}>
                 <Icon size={17} strokeWidth={active ? 2.3 : 1.9} /> {label}
