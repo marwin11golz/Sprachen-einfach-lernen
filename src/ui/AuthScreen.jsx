@@ -3,7 +3,7 @@
 
 import React, { useState } from 'react';
 import { CheckCircle2, RefreshCw, LogOut, CloudOff } from 'lucide-react';
-import { btnPrimary, btnSecondary, btnGhost, surface, typoH2, typoBody, typoSecondary, typoCaption, SPACE, RADIUS, FONT } from '../lib/theme.js';
+import { btnPrimary, btnSecondary, btnGhost, typoH2, typoBody, typoSecondary, typoCaption, SPACE, RADIUS, FONT } from '../lib/theme.js';
 
 function fmtTime(iso) {
   if (!iso) return 'noch nie';
@@ -24,13 +24,12 @@ export default function AuthScreen({
   const [password, setPassword] = useState('');
   const [notice, setNotice] = useState(null);
 
-  const card = {
-    ...surface(T, { lift: true }),
-    padding: SPACE.xl, maxWidth: 420, margin: '0 auto',
-  };
+  // Ohne Kasten wie die uebrigen Ansichten - die Breitenbegrenzung allein haelt
+  // das Formular zusammen, dafuer braucht es keinen Rahmen.
+  const card = { maxWidth: 420, margin: '0 auto' };
   const input = {
     width: '100%', padding: '13px 15px', borderRadius: RADIUS.md,
-    border: `1px solid ${T.border}`, background: T.bg, color: T.ink,
+    border: `1px solid ${T.border}`, background: T.background, color: T.textPrimary,
     fontSize: FONT.md, marginBottom: SPACE.md, outline: 'none',
   };
 
@@ -40,7 +39,7 @@ export default function AuthScreen({
         <div style={{ ...typoH2(), marginBottom: 10 }}>
           Abgleich nicht eingerichtet
         </div>
-        <div style={{ ...typoBody(), color: T.inkSoft }}>
+        <div style={{ ...typoBody(), color: T.textSecondary }}>
           Für diese Fassung der App sind keine Zugangsdaten zur Datenbank hinterlegt.
           Die App funktioniert vollständig – deine Vokabeln bleiben aber nur auf
           diesem Gerät.
@@ -57,13 +56,13 @@ export default function AuthScreen({
         <div style={{ ...typoH2(), marginBottom: 4 }}>
           Angemeldet
         </div>
-        <div className="mono" style={{ fontSize: FONT.sm, color: T.inkSoft, marginBottom: 18 }}>
+        <div className="mono" style={{ fontSize: FONT.sm, color: T.textSecondary, marginBottom: 18 }}>
           {auth.user.email}
         </div>
 
         <div style={{
           display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px',
-          borderRadius: RADIUS.pill, background: T.accentSoft, color: T.accent,
+          borderRadius: RADIUS.pill, background: T.primarySoft, color: T.primary,
           ...typoSecondary(), marginBottom: 8,
         }}>
           <CheckCircle2 size={16} />
@@ -72,8 +71,8 @@ export default function AuthScreen({
 
         {sync.syncError && (
           <div style={{
-            padding: '10px 12px', borderRadius: RADIUS.md, background: T.dangerSoft,
-            color: T.danger, ...typoSecondary('sm'), marginBottom: 8,
+            padding: '10px 12px', borderRadius: RADIUS.md, background: T.errorSoft,
+            color: T.error, ...typoSecondary('sm'), marginBottom: 8,
           }}>
             Letzter Abgleich fehlgeschlagen: {sync.syncError}
           </div>
@@ -97,7 +96,7 @@ export default function AuthScreen({
           </button>
         </div>
 
-        <div style={{ ...typoCaption(), color: T.inkSoft, marginTop: 16 }}>
+        <div style={{ ...typoCaption(), color: T.textSecondary, marginTop: 16 }}>
           Melde dich auf deinem anderen Gerät mit derselben E-Mail an, dann haben
           beide denselben Stand. Ein zweites Konto wäre ein zweiter, getrennter
           Kartenstapel.
@@ -124,7 +123,7 @@ export default function AuthScreen({
       <div style={{ ...typoH2(), marginBottom: 6 }}>
         {mode === 'signin' ? 'Anmelden' : 'Konto erstellen'}
       </div>
-      <div style={{ ...typoBody(), color: T.inkSoft, marginBottom: 18 }}>
+      <div style={{ ...typoBody(), color: T.textSecondary, marginBottom: 18 }}>
         Damit Handy und iPad dieselben Vokabeln haben. Ohne Anmeldung funktioniert
         die App weiter – die Karten bleiben dann nur auf diesem Gerät.
       </div>
@@ -142,7 +141,7 @@ export default function AuthScreen({
         />
 
         {auth.authError && (
-          <div style={{ color: T.danger, ...typoSecondary('sm'), marginBottom: 10 }}>
+          <div style={{ color: T.error, ...typoSecondary('sm'), marginBottom: 10 }}>
             {auth.authError}
           </div>
         )}
@@ -170,7 +169,7 @@ export default function AuthScreen({
         </button>
       </div>
 
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6, ...typoCaption(), color: T.inkSoft, marginTop: 18 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, ...typoCaption(), color: T.textSecondary, marginTop: 18 }}>
         <CloudOff size={13} /> Ohne Anmeldung: alles bleibt lokal auf diesem Gerät.
       </div>
     </div>

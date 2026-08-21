@@ -21,10 +21,10 @@ export default function SyncBadge({ T, state, onClick }) {
   const { text, Icon } = LABELS[state] || { text: 'Cloud', Icon: Cloud };
 
   const tone = state === 'error'
-    ? { fg: T.danger, bg: T.dangerSoft }
+    ? { fg: T.error, bg: T.errorSoft }
     : state === 'idle'
-      ? { fg: T.accent, bg: T.accentSoft }
-      : { fg: T.inkSoft, bg: 'transparent' };
+      ? { fg: T.primary, bg: T.primarySoft }
+      : { fg: T.textSecondary, bg: 'transparent' };
 
   return (
     <button
@@ -33,7 +33,7 @@ export default function SyncBadge({ T, state, onClick }) {
       style={{
         display: 'flex', alignItems: 'center', gap: 6,
         padding: '8px 13px', borderRadius: RADIUS.pill, cursor: 'pointer',
-        border: tone.bg === 'transparent' ? `1px solid ${T.border}` : 'none',
+        border: tone.bg === 'transparent' ? `1px solid ${T.hairline}` : 'none',
         background: tone.bg, color: tone.fg,
         ...typoSecondary('sm'), whiteSpace: 'nowrap',
       }}
