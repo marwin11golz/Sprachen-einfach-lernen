@@ -13,7 +13,7 @@ import {
 } from './lib/srs.js';
 import {
   THEMES, hexToRgba, SPACE, RADIUS, FONT, NAVBAR_H,
-  btnPrimary, btnSecondary, btnGhost, ratingBtn, surface,
+  btnPrimary, btnSecondary, btnGhost, ratingBtn, surface, surfaceSoft, divider,
   typoDisplay, typoH1, typoH2, typoBody, typoSecondary, typoCaption, typoNumber,
 } from './lib/theme.js';
 import { useVocabStore } from './hooks/useVocabStore.js';
@@ -461,8 +461,10 @@ export default function VokabelTrainer() {
     ::-webkit-scrollbar-thumb { background: ${T.border}; border-radius: 4px; }
 
     .press:active { transform: scale(.97); }
-    .row-link { transition: border-color .15s, background .15s; }
-    .row-link:hover { border-color: ${T.accent}; }
+    /* Die Zeilen haben keinen eigenen Rand mehr, den man einfaerben koennte -
+       das Ueberfahren zeigt sich jetzt als leicht abgesetzte Flaeche. */
+    .row-link { transition: background .15s; }
+    .row-link:hover { background: ${T.bgElev}; }
     .stamp:hover { outline: 1px solid ${T.accent}; }
 
     /* Die Lernkarte kommt bei jedem Wechsel kurz herein - das macht den
@@ -575,7 +577,7 @@ export default function VokabelTrainer() {
                 )}
 
                 {!isWriteInteraction && revealed && (
-                  <div className="rise-in" style={{ marginTop: SPACE.xl, paddingTop: SPACE.xl, borderTop: `1px solid ${T.border}` }}>
+                  <div className="rise-in" style={{ marginTop: SPACE.xl, paddingTop: SPACE.xl, ...divider(T) }}>
                     <div style={{ ...typoH2(), color: T.accent }}>{displayBack}</div>
                     {/* Beim umgedrehten Lernen steht das Fremdwort hier - ohne
                         eigenen Knopf waere gerade das nicht zu hoeren. */}
@@ -632,7 +634,7 @@ export default function VokabelTrainer() {
             {/* Aktionsleiste unten - dort, wo der Daumen ohnehin liegt */}
             <div style={{
               flexShrink: 0, padding: `${SPACE.lg}px ${SPACE.lg}px calc(${SPACE.lg}px + env(safe-area-inset-bottom))`,
-              borderTop: `1px solid ${T.border}`, background: T.bgElev,
+              ...divider(T), background: T.bgElev,
             }}>
               <div style={{ maxWidth: 520, margin: '0 auto' }}>
                 {!revealed ? (
@@ -702,7 +704,7 @@ export default function VokabelTrainer() {
       <style>{globalCss}</style>
 
       {/* Kopfzeile */}
-      <div style={{ borderBottom: `1px solid ${T.border}`, position: 'sticky', top: 0, background: hexToRgba(T.bg, .92), backdropFilter: 'blur(10px)', zIndex: 10 }}>
+      <div style={{ borderBottom: `1px solid ${T.hairline}`, position: 'sticky', top: 0, background: hexToRgba(T.bg, .92), backdropFilter: 'blur(10px)', zIndex: 10 }}>
         <div style={{
           maxWidth: 980, margin: '0 auto',
           padding: `calc(${SPACE.md}px + env(safe-area-inset-top)) ${SPACE.lg}px ${SPACE.md}px`,
@@ -771,8 +773,10 @@ export default function VokabelTrainer() {
         {/* ---------- DASHBOARD ---------- */}
         {view === 'dashboard' && (
           <div>
-            {/* Einstieg: was heute ansteht, und ein Knopf, der es startet */}
-            <div style={{ ...surface(T, { lift: true }), padding: SPACE.xl, marginBottom: SPACE.lg }}>
+            {/* Einstieg: was heute ansteht, und ein Knopf, der es startet. Steht
+                ohne Kasten direkt auf der Seite - es ist der Hauptinhalt, nicht
+                eine Kachel unter vielen. */}
+            <div style={{ marginBottom: SPACE.xxxl }}>
               <div className="hero">
                 <ProgressRing
                   percent={dayPercent} track={T.accentSoft} color={T.accent}
@@ -796,8 +800,10 @@ export default function VokabelTrainer() {
                         : <>Unter „Hinzufügen“ Vokabeln anlegen, dann kann's losgehen.</>}
                   </div>
                   <div style={{ display: 'flex', gap: SPACE.sm, flexWrap: 'wrap' }}>
+                    {/* Die eine Hauptaktion nimmt den Platz, der uebrig ist - so
+                        ist sie das Erste, worauf der Blick faellt. */}
                     <button className="press" onClick={() => startStudy(null, null)} disabled={dueCards.length === 0}
-                      style={{ ...btnPrimary(T, 'lg'), opacity: dueCards.length === 0 ? .45 : 1, cursor: dueCards.length === 0 ? 'default' : 'pointer' }}>
+                      style={{ ...btnPrimary(T, 'lg'), flex: 1, minWidth: 200, opacity: dueCards.length === 0 ? .45 : 1, cursor: dueCards.length === 0 ? 'default' : 'pointer' }}>
                       Lernen starten <ChevronRight size={18} />
                     </button>
                     <button className="press" onClick={() => startStudy(null, null, false)} disabled={cards.length === 0}
@@ -809,21 +815,20 @@ export default function VokabelTrainer() {
               </div>
             </div>
 
-            {/* Kennzahlen - eine kompakte Zeile statt sechs gleich lauter Kacheln */}
-            <div style={{ ...surface(T), display: 'flex', marginBottom: SPACE.lg, overflow: 'hidden' }}>
+            {/* Kennzahlen - drei Werte nebeneinander, allein durch Abstand
+                getrennt. Ein Rahmen drumherum wuerde sie zu einer Kachel machen,
+                obwohl sie nur eine Zeile Information sind. */}
+            <div style={{ display: 'flex', gap: SPACE.xl, marginBottom: SPACE.xxxl, flexWrap: 'wrap' }}>
               {[
                 [<Flame size={15} key="i" />, 'Streak', `${streak}`, streak > 0 ? T.danger : T.inkSoft, streak === 1 ? 'Tag' : 'Tage'],
                 [null, 'Gelernt', `${learnedCount}`, T.ink, `von ${cards.length}`],
                 [null, 'Trefferquote', `${successRate}`, T.success, '%'],
-              ].map(([icon, label, val, color, unit], i) => (
-                <div key={label} style={{
-                  flex: 1, padding: `${SPACE.lg}px ${SPACE.md}px`, textAlign: 'center', minWidth: 0,
-                  borderLeft: i > 0 ? `1px solid ${T.border}` : 'none',
-                }}>
-                  <div style={{ fontSize: FONT.xs, color: T.inkSoft, marginBottom: SPACE.sm, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: SPACE.xs }}>
+              ].map(([icon, label, val, color, unit]) => (
+                <div key={label} style={{ flex: 1, minWidth: 90 }}>
+                  <div style={{ fontSize: FONT.xs, color: T.inkSoft, marginBottom: SPACE.xs, display: 'flex', alignItems: 'center', gap: SPACE.xs }}>
                     {icon}{label}
                   </div>
-                  <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'center', gap: SPACE.xs }}>
+                  <div style={{ display: 'flex', alignItems: 'baseline', gap: SPACE.xs }}>
                     <span className="mono" style={{ ...typoNumber(), color }}>{val}</span>
                     <span style={{ ...typoCaption(), color: T.inkSoft }}>{unit}</span>
                   </div>
@@ -846,13 +851,18 @@ export default function VokabelTrainer() {
                   </label>
                 </div>
 
-                <div style={{ display: 'flex', flexDirection: 'column', gap: SPACE.sm }}>
-                  {decks.map(d => {
+                {/* Eine Liste mit Haarlinien statt eines Stapels aus Karten -
+                    die Kartenboxen gehoeren zusammen und werden auch so gelesen. */}
+                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                  {decks.map((d, i) => {
                     const color = d.type === 'gap' ? T.gold : T.accent;
                     const soft = d.type === 'gap' ? T.goldSoft : T.accentSoft;
                     const progress = d.total > 0 ? Math.round((d.learned / d.total) * 100) : 0;
                     return (
-                      <div key={d.key} className="row-link" style={{ ...surface(T), padding: SPACE.lg }}>
+                      <div key={d.key} className="row-link" style={{
+                        padding: `${SPACE.lg}px ${SPACE.md}px`, borderRadius: RADIUS.md,
+                        ...(i > 0 ? divider(T) : null),
+                      }}>
                         <div className="deck-head" style={{ display: 'flex', alignItems: 'center', gap: SPACE.md, marginBottom: SPACE.md }}>
                           <div style={{ width: 40, height: 40, borderRadius: RADIUS.md, background: soft, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                             {d.type === 'gap' ? <PenLine size={18} color={color} /> : <BookOpen size={18} color={color} />}
@@ -885,7 +895,7 @@ export default function VokabelTrainer() {
                     );
                   })}
                   {decks.length === 0 && (
-                    <div style={{ ...surface(T), border: `1px dashed ${T.border}`, padding: `${SPACE.xxl}px ${SPACE.lg}px`, textAlign: 'center' }}>
+                    <div style={{ padding: `${SPACE.xxl}px ${SPACE.lg}px`, textAlign: 'center' }}>
                       <BookOpen size={30} color={T.inkSoft} style={{ marginBottom: SPACE.md, opacity: .6 }} />
                       <div style={{ ...typoH2(), marginBottom: SPACE.xs }}>Noch keine Karten</div>
                       <div style={{ color: T.inkSoft, ...typoBody(), marginBottom: SPACE.lg }}>
@@ -899,10 +909,10 @@ export default function VokabelTrainer() {
                 </div>
 
                 {difficultCards.length > 0 && (
-                  <div style={{ ...surface(T), padding: SPACE.lg, marginTop: SPACE.lg }}>
+                  <div style={{ marginTop: SPACE.xxxl }}>
                     <div style={{ ...typoSecondary('sm'), color: T.inkSoft, marginBottom: SPACE.md }}>Fehlerkartei</div>
                     {difficultCards.map((c, i) => (
-                      <div key={c.id} style={{ display: 'flex', justifyContent: 'space-between', padding: `${SPACE.sm}px 0`, borderTop: i > 0 ? `1px solid ${T.border}` : 'none', gap: SPACE.md }}>
+                      <div key={c.id} style={{ display: 'flex', justifyContent: 'space-between', padding: `${SPACE.sm}px 0`, ...(i > 0 ? divider(T) : null), gap: SPACE.md }}>
                         <span style={{ fontSize: FONT.md, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                           {c.type === 'gap' ? revealSentence(c.sentence) : `${c.front} → ${splitAnswer(c.back).answer}`}
                         </span>
@@ -916,7 +926,7 @@ export default function VokabelTrainer() {
               {/* Aktivität */}
               <div style={{ minWidth: 0 }}>
                 <div style={{ ...typoH2(), marginBottom: SPACE.md }}>Aktivität</div>
-                <div style={{ ...surface(T), padding: SPACE.lg }}>
+                <div>
                   <div style={{ display: 'flex', alignItems: 'baseline', gap: SPACE.sm, marginBottom: SPACE.xs }}>
                     <span className="mono" style={{ ...typoNumber(), color: T.accent }}>
                       {heatmap.weeks.flat().reduce((s, d) => s + d.count, 0)}
@@ -976,7 +986,7 @@ export default function VokabelTrainer() {
             </div>
 
             {addTab === 'vocab' && (
-              <div style={{ ...surface(T), padding: SPACE.xl, maxWidth: 620 }}>
+              <div style={{ maxWidth: 620 }}>
                 <label style={{ ...typoSecondary('sm'), color: T.inkSoft, display: 'block', marginBottom: SPACE.sm }}>Sprachpaar</label>
                 <select value={pairIdx} onChange={e => setPairIdx(Number(e.target.value))}
                   style={{ ...inputStyle, maxWidth: 320, marginBottom: SPACE.lg, cursor: 'pointer' }}>
@@ -1003,7 +1013,7 @@ export default function VokabelTrainer() {
             )}
 
             {addTab === 'gap' && (
-              <div style={{ ...surface(T), padding: SPACE.xl, maxWidth: 620 }}>
+              <div style={{ maxWidth: 620 }}>
                 <label style={{ ...typoSecondary('sm'), color: T.inkSoft, display: 'block', marginBottom: SPACE.sm }}>Sprache</label>
                 <select value={sentenceLangIdx} onChange={e => setSentenceLangIdx(Number(e.target.value))}
                   style={{ ...inputStyle, maxWidth: 320, marginBottom: SPACE.lg, cursor: 'pointer' }}>
@@ -1057,7 +1067,7 @@ export default function VokabelTrainer() {
             </div>
 
             {exportText !== null && (
-              <div className="rise-in" style={{ ...surface(T), padding: SPACE.lg, marginBottom: SPACE.lg }}>
+              <div className="rise-in" style={{ ...surfaceSoft(T), padding: SPACE.lg, marginBottom: SPACE.lg }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: SPACE.md }}>
                   <div style={{ ...typoSecondary() }}>Sicherung</div>
                   <button className="press" onClick={() => setExportText(null)} style={btnGhost(T)}>Schließen</button>
@@ -1072,20 +1082,16 @@ export default function VokabelTrainer() {
               </div>
             )}
 
-            <div style={{ ...surface(T), border: `1px dashed ${T.border}`, padding: SPACE.lg, marginBottom: SPACE.lg }}>
-              <div style={{ ...typoSecondary(), marginBottom: SPACE.md }}>Sicherung einspielen</div>
-              <textarea value={importPasteText} onChange={e => setImportPasteText(e.target.value)} rows={3}
-                placeholder="Gesicherten Text hier einfügen…"
-                style={{ ...inputStyle, background: T.bg, fontSize: FONT.xs, fontFamily: "'IBM Plex Mono', monospace", resize: 'vertical' }} />
-              <button className="press" onClick={importFromPaste} style={{ ...btnSecondary(T), marginTop: SPACE.md, opacity: importPasteText.trim() ? 1 : .5 }} disabled={!importPasteText.trim()}>
-                Einfügen & importieren
-              </button>
-            </div>
-
             <div style={{ fontSize: FONT.sm, color: T.inkSoft, marginBottom: SPACE.md }}>{filtered.length} Karte(n)</div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: SPACE.sm }}>
-              {filtered.map(c => (
-                <div key={c.id} className="row-link" style={{ ...surface(T), padding: `${SPACE.md}px ${SPACE.lg}px`, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: SPACE.md }}>
+            {/* Auch hier eine Liste statt vieler Einzelkarten - bei hunderten
+                Eintraegen waere jede eigene Umrandung nur Unruhe. */}
+            <div style={{ display: 'flex', flexDirection: 'column' }}>
+              {filtered.map((c, i) => (
+                <div key={c.id} className="row-link" style={{
+                  padding: `${SPACE.md}px ${SPACE.md}px`, borderRadius: RADIUS.md,
+                  display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: SPACE.md,
+                  ...(i > 0 ? divider(T) : null),
+                }}>
                   <div style={{ minWidth: 0 }}>
                     {c.type === 'gap' ? (
                       <div style={{ ...typoSecondary(), overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{revealSentence(c.sentence)}</div>
@@ -1103,10 +1109,22 @@ export default function VokabelTrainer() {
                 </div>
               ))}
               {filtered.length === 0 && (
-                <div style={{ ...surface(T), border: `1px dashed ${T.border}`, color: T.inkSoft, textAlign: 'center', padding: SPACE.xxl }}>
+                <div style={{ color: T.inkSoft, textAlign: 'center', padding: SPACE.xxl }}>
                   Keine Karten gefunden.
                 </div>
               )}
+            </div>
+
+            {/* Selten gebraucht, deshalb hinter der Kartenliste - ohne Kasten
+                muss die Reihenfolge die Rangfolge tragen. */}
+            <div style={{ marginTop: SPACE.xxxl }}>
+              <div style={{ ...typoSecondary(), marginBottom: SPACE.md }}>Sicherung einspielen</div>
+              <textarea value={importPasteText} onChange={e => setImportPasteText(e.target.value)} rows={3}
+                placeholder="Gesicherten Text hier einfügen…"
+                style={{ ...inputStyle, background: T.bg, fontSize: FONT.xs, fontFamily: "'IBM Plex Mono', monospace", resize: 'vertical' }} />
+              <button className="press" onClick={importFromPaste} style={{ ...btnSecondary(T), marginTop: SPACE.md, opacity: importPasteText.trim() ? 1 : .5 }} disabled={!importPasteText.trim()}>
+                Einfügen & importieren
+              </button>
             </div>
           </div>
         )}

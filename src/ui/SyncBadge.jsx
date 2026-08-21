@@ -33,7 +33,7 @@ export default function SyncBadge({ T, state, onClick }) {
       style={{
         display: 'flex', alignItems: 'center', gap: 6,
         padding: '8px 13px', borderRadius: RADIUS.pill, cursor: 'pointer',
-        border: tone.bg === 'transparent' ? `1px solid ${T.border}` : 'none',
+        border: tone.bg === 'transparent' ? `1px solid ${T.hairline}` : 'none',
         background: tone.bg, color: tone.fg,
         ...typoSecondary('sm'), whiteSpace: 'nowrap',
       }}

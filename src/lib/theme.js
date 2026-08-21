@@ -11,7 +11,10 @@ export function hexToRgba(hex, alpha) {
 // ---------- Raster ----------
 // Feste Stufen statt Ad-hoc-Werten - macht Abstand/Rundung/Schriftgröße
 // überall im Code vorhersehbar statt an jeder Stelle neu erfunden.
-export const SPACE = { xs: 4, sm: 8, md: 12, lg: 16, xl: 24, xxl: 32 };
+// xxxl traegt den Abstand zwischen zwei Abschnitten. Seit die Bereiche nicht mehr
+// in eigenen Kaesten liegen, ist der Abstand das Einzige, was sie trennt - dafuer
+// reichten die bis 32 laufenden Stufen nicht aus.
+export const SPACE = { xs: 4, sm: 8, md: 12, lg: 16, xl: 24, xxl: 32, xxxl: 48 };
 export const RADIUS = { sm: 6, md: 8, lg: 12, pill: 999 };
 export const FONT = { xs: 11, sm: 12, base: 13, md: 14, lg: 16, xl: 18, xxl: 22, hero: 32 };
 
@@ -24,7 +27,10 @@ export const NAVBAR_H = 84;
 export const THEMES = {
   light: {
     bg: '#F4F6F3', bgElev: '#FFFFFF', ink: '#131815', inkSoft: '#69736C',
-    border: '#E2E7DF', accent: '#0F7A5A', accentSoft: '#E2F2EA', accentInk: '#FFFFFF',
+    // hairline traegt Trennlinien und Strukturkanten. Deutlich schwaecher als
+    // border, das den Eingabefeldern und Knoepfen vorbehalten bleibt - dort ist
+    // ein sichtbarer Rand eine Bedienhilfe, zwischen zwei Listenzeilen nicht.
+    border: '#E2E7DF', hairline: '#ECEFE9', accent: '#0F7A5A', accentSoft: '#E2F2EA', accentInk: '#FFFFFF',
     accentDeep: '#0A5F46',
     gold: '#B07C2C', goldSoft: '#FBF0DC',
     blue: '#2F5488', blueSoft: '#E7EDF6',
@@ -39,7 +45,7 @@ export const THEMES = {
     bg: '#0D110F', bgElev: '#161C19', ink: '#ECEFEA', inkSoft: '#8F9992',
     // Der helle Akzent im dunklen Design traegt weissen Text nicht - darauf
     // gehoert dunkle Schrift, sonst ist der Hauptknopf kaum lesbar.
-    border: '#253029', accent: '#3FC08D', accentSoft: '#15332690', accentInk: '#08120D',
+    border: '#253029', hairline: '#1B211D', accent: '#3FC08D', accentSoft: '#15332690', accentInk: '#08120D',
     accentDeep: '#63D6A6',
     gold: '#DDA95C', goldSoft: '#2E2411',
     blue: '#7FA0CC', blueSoft: '#1B2735',
@@ -92,13 +98,26 @@ export function ratingBtn(color, bg) {
   };
 }
 
-// Wiederkehrendes Flaechen-Rezept, das bisher an ueber einem Dutzend Stellen
-// wortgleich ausgeschrieben stand.
+// Abgesetzte Flaeche fuer die wenigen Stellen, an denen eine Karte wirklich eine
+// Karte ist - allen voran die Lernkarte. Flach traegt sie nur noch eine Haarlinie
+// und keinen Schatten mehr: zwei Mittel fuer dieselbe Abgrenzung sind eines zu viel.
 export function surface(T, { lift = false } = {}) {
   return {
-    background: T.bgElev, border: `1px solid ${T.border}`, borderRadius: RADIUS.lg,
-    boxShadow: lift ? T.shadowLift : T.shadow,
+    background: T.bgElev, border: `1px solid ${T.hairline}`, borderRadius: RADIUS.lg,
+    ...(lift ? { boxShadow: T.shadowLift } : null),
   };
+}
+
+// Flaeche ganz ohne Rand - hebt sich allein durch den Untergrund ab. Fuer Bereiche,
+// die eingeblendet werden und deshalb Abgrenzung brauchen, ohne als Kasten zu wirken.
+export function surfaceSoft(T) {
+  return { background: T.bgElev, borderRadius: RADIUS.lg };
+}
+
+// Trennlinie zwischen zwei Zeilen einer Liste. Ersetzt die Kaesten um jede einzelne
+// Zeile: eine Liste ist ein Block mit Linien darin, nicht ein Stapel von Karten.
+export function divider(T) {
+  return { borderTop: `1px solid ${T.hairline}` };
 }
 
 // ---------- Typography System ----------

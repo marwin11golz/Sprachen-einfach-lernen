@@ -3,7 +3,7 @@
 
 import React, { useState } from 'react';
 import { CheckCircle2, RefreshCw, LogOut, CloudOff } from 'lucide-react';
-import { btnPrimary, btnSecondary, btnGhost, surface, typoH2, typoBody, typoSecondary, typoCaption, SPACE, RADIUS, FONT } from '../lib/theme.js';
+import { btnPrimary, btnSecondary, btnGhost, typoH2, typoBody, typoSecondary, typoCaption, SPACE, RADIUS, FONT } from '../lib/theme.js';
 
 function fmtTime(iso) {
   if (!iso) return 'noch nie';
@@ -24,10 +24,9 @@ export default function AuthScreen({
   const [password, setPassword] = useState('');
   const [notice, setNotice] = useState(null);
 
-  const card = {
-    ...surface(T, { lift: true }),
-    padding: SPACE.xl, maxWidth: 420, margin: '0 auto',
-  };
+  // Ohne Kasten wie die uebrigen Ansichten - die Breitenbegrenzung allein haelt
+  // das Formular zusammen, dafuer braucht es keinen Rahmen.
+  const card = { maxWidth: 420, margin: '0 auto' };
   const input = {
     width: '100%', padding: '13px 15px', borderRadius: RADIUS.md,
     border: `1px solid ${T.border}`, background: T.bg, color: T.ink,
