@@ -634,7 +634,7 @@ export default function VokabelTrainer() {
             {/* Aktionsleiste unten - dort, wo der Daumen ohnehin liegt */}
             <div style={{
               flexShrink: 0, padding: `${SPACE.lg}px ${SPACE.lg}px calc(${SPACE.lg}px + env(safe-area-inset-bottom))`,
-              ...divider(T), background: T.surfaceElevated,
+              ...divider(T), background: T.background,
             }}>
               <div style={{ maxWidth: 520, margin: '0 auto' }}>
                 {!revealed ? (
@@ -659,13 +659,16 @@ export default function VokabelTrainer() {
                   </>
                 ) : (
                   <div className="rise-in" style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: SPACE.sm }}>
+                    {/* Neutrale Kacheln, die Bewertung steckt allein in der Schrift.
+                        Vier getönte Flächen nebeneinander waren die bunteste Stelle
+                        der App - die Farbcodierung bleibt, das Bunte geht. */}
                     {[
-                      ['again', 'Nochmal', T.error, T.errorSoft, '1'],
-                      ['hard', 'Schwer', T.warning, T.warningSoft, '2'],
-                      ['good', 'Gut', T.success, T.successSoft, '3'],
-                      ['easy', 'Einfach', T.primary, T.primarySoft, '4'],
-                    ].map(([key, label, color, bg, num]) => (
-                      <button key={key} className="press" onClick={() => submitRating(key)} style={ratingBtn(color, bg)}>
+                      ['again', 'Nochmal', T.error, '1'],
+                      ['hard', 'Schwer', T.warning, '2'],
+                      ['good', 'Gut', T.success, '3'],
+                      ['easy', 'Einfach', T.primary, '4'],
+                    ].map(([key, label, color, num]) => (
+                      <button key={key} className="press" onClick={() => submitRating(key)} style={ratingBtn(color, T.surfaceElevated)}>
                         {label}<span className="mono" style={{ fontSize: FONT.xs, opacity: .65 }}>{num}</span>
                       </button>
                     ))}
@@ -820,7 +823,10 @@ export default function VokabelTrainer() {
                 obwohl sie nur eine Zeile Information sind. */}
             <div style={{ display: 'flex', gap: SPACE.xl, marginBottom: SPACE.xxxl, flexWrap: 'wrap' }}>
               {[
-                [<Flame size={15} key="i" />, 'Streak', `${streak}`, streak > 0 ? T.error : T.textSecondary, streak === 1 ? 'Tag' : 'Tage'],
+                // Eine laufende Streak ist ein Erfolg. Sie stand bisher in der
+                // Fehlerfarbe - als Feuer-Metapher gedacht, im Rollensystem aber
+                // schlicht falsch, und die roteste Stelle des Dashboards.
+                [<Flame size={15} key="i" />, 'Streak', `${streak}`, streak > 0 ? T.primary : T.textSecondary, streak === 1 ? 'Tag' : 'Tage'],
                 [null, 'Gelernt', `${learnedCount}`, T.textPrimary, `von ${cards.length}`],
                 [null, 'Trefferquote', `${successRate}`, T.success, '%'],
               ].map(([icon, label, val, color, unit]) => (

@@ -70,15 +70,21 @@ export const THEMES = {
     shadowLift: '0 2px 8px rgba(18,28,22,.08)',
   },
   dark: {
-    background: '#080B0A', surface: '#0F1412', surfaceElevated: '#151B18',
-    textPrimary: '#E8EDEA', textSecondary: '#8E9A94', textMuted: '#626D67',
-    border: '#212B25', hairline: '#171E1A',
-    // Der helle Gruenton traegt keine weisse Schrift - darauf gehoert dunkle,
-    // sonst ist der Hauptknopf kaum lesbar. Dafuer ist primaryInk da.
-    primary: '#34D399', primarySoft: '#15362A', primaryInk: '#04140D',
-    success: '#2FBF88', successSoft: '#0E2419',
-    warning: '#E0A94F', warningSoft: '#2A2113',
-    error: '#E5707C', errorSoft: '#2A1518',
+    // Sehr dunkles Gruen-Grau, bewusst kein reines Schwarz: der leichte Farbstich
+    // nimmt dem Grund die Haerte. Die beiden Flaechen liegen nur knapp darueber -
+    // sie sollen sich abheben, nicht auffallen.
+    background: '#0C110F', surface: '#121815', surfaceElevated: '#171E1B',
+    // Warmes Off-White statt hartem Reinweiss, Sekundaertext gedaempft mit
+    // leicht gruenlichem Charakter - das haelt die Flaeche ruhig.
+    textPrimary: '#EBE9E4', textSecondary: '#8B9791', textMuted: '#616C66',
+    // Kaum sichtbar, absichtlich: die Gliederung traegt der Abstand.
+    border: '#1E2622', hairline: '#171D1A',
+    // Kraeftiges Emerald, aber kein Neon. Der Ton traegt keine weisse Schrift -
+    // darauf gehoert dunkle, sonst ist der Hauptknopf kaum lesbar (primaryInk).
+    primary: '#3AC98F', primarySoft: '#163027', primaryInk: '#04140D',
+    success: '#34BE88', successSoft: '#12281D',
+    warning: '#DDA55C', warningSoft: '#28200F',
+    error: '#E0808A', errorSoft: '#281619',
     shadowLift: '0 2px 8px rgba(0,0,0,.35)',
   },
 };
