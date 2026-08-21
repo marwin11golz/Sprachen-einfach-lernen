@@ -742,7 +742,8 @@ export default function VokabelTrainer() {
         {toast && (
           <div style={{
             position: 'fixed', bottom: `calc(120px + env(safe-area-inset-bottom))`, left: '50%', transform: 'translateX(-50%)',
-            background: T.textPrimary, color: T.background, padding: `${SPACE.md}px ${SPACE.xl}px`, borderRadius: RADIUS.pill,
+            background: T.surfaceElevated, color: T.textPrimary, border: `1px solid ${T.border}`,
+            padding: `${SPACE.md}px ${SPACE.xl}px`, borderRadius: RADIUS.pill,
             fontSize: FONT.md, maxWidth: '90vw', textAlign: 'center', boxShadow: T.shadowLift, zIndex: 50,
           }}>
             {toast}
@@ -1228,7 +1229,8 @@ export default function VokabelTrainer() {
       {toast && (
         <div style={{
           position: 'fixed', bottom: `calc(${NAVBAR_H + SPACE.lg}px + env(safe-area-inset-bottom))`, left: '50%', transform: 'translateX(-50%)',
-          background: T.textPrimary, color: T.background, padding: `${SPACE.md}px ${SPACE.xl}px`, borderRadius: RADIUS.pill,
+          background: T.surfaceElevated, color: T.textPrimary, border: `1px solid ${T.border}`,
+            padding: `${SPACE.md}px ${SPACE.xl}px`, borderRadius: RADIUS.pill,
           fontSize: FONT.md, maxWidth: '90vw', textAlign: 'center', boxShadow: T.shadowLift, zIndex: 30,
         }}>
           {toast}
