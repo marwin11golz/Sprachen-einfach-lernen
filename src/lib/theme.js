@@ -159,3 +159,16 @@ export function typoCaption() {
     letterSpacing: 0,
   };
 }
+
+// Kennzahlen in Mono (Faellig-Ring, Statistik-Kacheln, Heatmap-Summe). Eigene
+// Rolle, weil Ziffern immer einzeilig stehen: Zeilenhoehe 1 haelt sie eng am
+// Beschriftungstext darunter, und ein negativer Buchstabenabstand wie bei den
+// Ueberschriften wuerde die tabellarischen Ziffern zusammenschieben.
+export function typoNumber(size = 'xxl') {
+  return {
+    fontSize: FONT[size],
+    fontWeight: 600,
+    lineHeight: 1,
+    letterSpacing: 0,
+  };
+}
