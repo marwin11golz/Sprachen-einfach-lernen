@@ -100,3 +100,62 @@ export function surface(T, { lift = false } = {}) {
     boxShadow: lift ? T.shadowLift : T.shadow,
   };
 }
+
+// ---------- Typography System ----------
+// Konsistente Hierarchie für alle UI-Elemente: Display, H1, H2, Body, Secondary, Caption
+// Ohne diese Funktionen: keine Exceptions mehr, immer über diese Utilities
+
+export function typoDisplay() {
+  return {
+    fontSize: FONT.hero,
+    fontWeight: 600,
+    lineHeight: 1.2,
+    letterSpacing: '-0.02em',
+  };
+}
+
+export function typoH1() {
+  return {
+    fontSize: FONT.xxl,
+    fontWeight: 600,
+    lineHeight: 1.25,
+    letterSpacing: '-0.01em',
+  };
+}
+
+export function typoH2() {
+  return {
+    fontSize: FONT.xl,
+    fontWeight: 600,
+    lineHeight: 1.3,
+    letterSpacing: '-0.01em',
+  };
+}
+
+export function typoBody(size = 'md') {
+  const lineHeight = size === 'lg' ? 1.6 : 1.5;
+  return {
+    fontSize: FONT[size],
+    fontWeight: 400,
+    lineHeight,
+    letterSpacing: 0,
+  };
+}
+
+export function typoSecondary(size = 'base') {
+  return {
+    fontSize: FONT[size],
+    fontWeight: 500,
+    lineHeight: 1.4,
+    letterSpacing: 0,
+  };
+}
+
+export function typoCaption() {
+  return {
+    fontSize: FONT.xs,
+    fontWeight: 500,
+    lineHeight: 1.2,
+    letterSpacing: 0,
+  };
+}

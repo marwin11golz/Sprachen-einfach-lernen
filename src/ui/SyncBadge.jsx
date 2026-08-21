@@ -6,7 +6,7 @@
 
 import React from 'react';
 import { Cloud, CloudOff, RefreshCw, AlertTriangle, CheckCircle2 } from 'lucide-react';
-import { RADIUS, FONT } from '../lib/theme.js';
+import { RADIUS, typoSecondary } from '../lib/theme.js';
 
 const LABELS = {
   disabled:  { text: 'lokal',        Icon: CloudOff },
@@ -35,7 +35,7 @@ export default function SyncBadge({ T, state, onClick }) {
         padding: '8px 13px', borderRadius: RADIUS.pill, cursor: 'pointer',
         border: tone.bg === 'transparent' ? `1px solid ${T.border}` : 'none',
         background: tone.bg, color: tone.fg,
-        fontSize: FONT.sm, fontWeight: 500, whiteSpace: 'nowrap',
+        ...typoSecondary('sm'), whiteSpace: 'nowrap',
       }}
     >
       <Icon size={14} /> {text}
