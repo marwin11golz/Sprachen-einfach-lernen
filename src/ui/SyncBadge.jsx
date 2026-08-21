@@ -21,10 +21,10 @@ export default function SyncBadge({ T, state, onClick }) {
   const { text, Icon } = LABELS[state] || { text: 'Cloud', Icon: Cloud };
 
   const tone = state === 'error'
-    ? { fg: T.danger, bg: T.dangerSoft }
+    ? { fg: T.error, bg: T.errorSoft }
     : state === 'idle'
-      ? { fg: T.accent, bg: T.accentSoft }
-      : { fg: T.inkSoft, bg: 'transparent' };
+      ? { fg: T.primary, bg: T.primarySoft }
+      : { fg: T.textSecondary, bg: 'transparent' };
 
   return (
     <button

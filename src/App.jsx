@@ -444,7 +444,7 @@ export default function VokabelTrainer() {
 
   const inputStyle = {
     width: '100%', padding: `${SPACE.md}px ${SPACE.lg}px`, borderRadius: RADIUS.md,
-    border: `1px solid ${T.border}`, background: T.bgElev, color: T.ink,
+    border: `1px solid ${T.border}`, background: T.surfaceElevated, color: T.textPrimary,
     fontSize: FONT.md, outline: 'none',
   };
 
@@ -454,9 +454,9 @@ export default function VokabelTrainer() {
     body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Inter, sans-serif; }
     .mono { font-family: 'IBM Plex Mono', monospace; font-variant-numeric: tabular-nums; }
     button { font-family: inherit; }
-    ::selection { background: ${T.accentSoft}; }
+    ::selection { background: ${T.primarySoft}; }
     input, textarea, select { font-family: inherit; }
-    input:focus, textarea:focus, select:focus { border-color: ${T.accent}; }
+    input:focus, textarea:focus, select:focus { border-color: ${T.primary}; }
     ::-webkit-scrollbar { height: 8px; width: 8px; }
     ::-webkit-scrollbar-thumb { background: ${T.border}; border-radius: 4px; }
 
@@ -464,8 +464,8 @@ export default function VokabelTrainer() {
     /* Die Zeilen haben keinen eigenen Rand mehr, den man einfaerben koennte -
        das Ueberfahren zeigt sich jetzt als leicht abgesetzte Flaeche. */
     .row-link { transition: background .15s; }
-    .row-link:hover { background: ${T.bgElev}; }
-    .stamp:hover { outline: 1px solid ${T.accent}; }
+    .row-link:hover { background: ${T.surfaceElevated}; }
+    .stamp:hover { outline: 1px solid ${T.primary}; }
 
     /* Die Lernkarte kommt bei jedem Wechsel kurz herein - das macht den
        Kartenwechsel sichtbar, ohne den Lernfluss zu bremsen. */
@@ -514,7 +514,7 @@ export default function VokabelTrainer() {
   if (view === 'study') {
     return (
       <div style={{
-        position: 'fixed', inset: 0, background: T.bg, color: T.ink,
+        position: 'fixed', inset: 0, background: T.background, color: T.textPrimary,
         fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Inter, sans-serif", display: 'flex', flexDirection: 'column',
       }}>
         <style>{globalCss}</style>
@@ -525,13 +525,13 @@ export default function VokabelTrainer() {
           display: 'flex', alignItems: 'center', gap: SPACE.md, flexShrink: 0,
         }}>
           <button className="press" onClick={() => setView('dashboard')} aria-label="Lernen beenden"
-            style={{ background: 'none', border: 'none', cursor: 'pointer', color: T.inkSoft, padding: 4, display: 'flex' }}>
+            style={{ background: 'none', border: 'none', cursor: 'pointer', color: T.textSecondary, padding: 4, display: 'flex' }}>
             <X size={22} />
           </button>
           <div style={{ flex: 1, height: 6, borderRadius: RADIUS.pill, background: T.border, overflow: 'hidden' }}>
-            <div style={{ height: '100%', width: `${sessionProgress}%`, background: T.accent, borderRadius: RADIUS.pill, transition: 'width .3s ease' }} />
+            <div style={{ height: '100%', width: `${sessionProgress}%`, background: T.primary, borderRadius: RADIUS.pill, transition: 'width .3s ease' }} />
           </div>
-          <div className="mono" style={{ fontSize: FONT.base, color: T.inkSoft, flexShrink: 0 }}>
+          <div className="mono" style={{ fontSize: FONT.base, color: T.textSecondary, flexShrink: 0 }}>
             {Math.min(sessionDone + 1, sessionTotal)}/{sessionTotal}
           </div>
         </div>
@@ -545,7 +545,7 @@ export default function VokabelTrainer() {
               <CheckCircle2 size={42} color={T.success} />
             </div>
             <div style={{ ...typoH1(), marginBottom: SPACE.sm }}>Geschafft</div>
-            <div style={{ color: T.inkSoft, marginBottom: SPACE.xl, maxWidth: 320, ...typoBody() }}>
+            <div style={{ color: T.textSecondary, marginBottom: SPACE.xl, maxWidth: 320, ...typoBody() }}>
               {sessionTotal} Karte{sessionTotal !== 1 ? 'n' : ''}{deckLabel ? ` in „${deckLabel}“` : ''} für heute erledigt.
             </div>
             <button className="press" onClick={() => setView('dashboard')} style={btnPrimary(T, 'lg')}>Zum Dashboard</button>
@@ -559,7 +559,7 @@ export default function VokabelTrainer() {
                 width: '100%', maxWidth: 520, textAlign: 'center',
                 padding: `${SPACE.xxl}px ${SPACE.xl}px`,
               }}>
-                <div className="mono" style={{ fontSize: FONT.xs, color: T.inkSoft, letterSpacing: '.08em', textTransform: 'uppercase', marginBottom: SPACE.lg }}>
+                <div className="mono" style={{ fontSize: FONT.xs, color: T.textSecondary, letterSpacing: '.08em', textTransform: 'uppercase', marginBottom: SPACE.lg }}>
                   {current.type === 'gap' ? `Satz · ${current.language}` : `${flipped ? current.langB : current.langA} → ${flipped ? current.langA : current.langB}`}
                 </div>
 
@@ -571,23 +571,23 @@ export default function VokabelTrainer() {
                   <button className="press"
                     onClick={() => speak(current.type === 'gap' ? revealSentence(current.sentence) : displayFront, frontLang)}
                     aria-label={`Vorlesen (${frontLang})`}
-                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: T.inkSoft, marginTop: SPACE.md, padding: 6 }}>
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: T.textSecondary, marginTop: SPACE.md, padding: 6 }}>
                     <Volume2 size={20} />
                   </button>
                 )}
 
                 {!isWriteInteraction && revealed && (
                   <div className="rise-in" style={{ marginTop: SPACE.xl, paddingTop: SPACE.xl, ...divider(T) }}>
-                    <div style={{ ...typoH2(), color: T.accent }}>{displayBack}</div>
+                    <div style={{ ...typoH2(), color: T.primary }}>{displayBack}</div>
                     {/* Beim umgedrehten Lernen steht das Fremdwort hier - ohne
                         eigenen Knopf waere gerade das nicht zu hoeren. */}
                     <button className="press" onClick={() => speak(displayBack, backLang)}
                       aria-label={`Antwort vorlesen (${backLang})`}
-                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: T.inkSoft, marginTop: SPACE.sm, padding: 6 }}>
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: T.textSecondary, marginTop: SPACE.sm, padding: 6 }}>
                       <Volume2 size={18} />
                     </button>
                     {displayExample && (
-                      <div style={{ ...typoBody(), color: T.inkSoft, marginTop: SPACE.sm }}>{displayExample}</div>
+                      <div style={{ ...typoBody(), color: T.textSecondary, marginTop: SPACE.sm }}>{displayExample}</div>
                     )}
                   </div>
                 )}
@@ -606,7 +606,7 @@ export default function VokabelTrainer() {
                       <div className="rise-in">
                         <div style={{
                           display: 'inline-flex', alignItems: 'center', gap: SPACE.sm, ...typoSecondary(),
-                          color: writeResult?.ok ? T.success : T.danger, background: writeResult?.ok ? T.successSoft : T.dangerSoft,
+                          color: writeResult?.ok ? T.success : T.error, background: writeResult?.ok ? T.successSoft : T.errorSoft,
                           padding: `${SPACE.sm}px ${SPACE.lg}px`, borderRadius: RADIUS.pill,
                         }}>
                           {writeResult?.ok ? <CheckCircle2 size={17} /> : <XCircle size={17} />}
@@ -618,11 +618,11 @@ export default function VokabelTrainer() {
                         <button className="press"
                           onClick={() => speak(current.type === 'gap' ? revealSentence(current.sentence) : displayBack, backLang)}
                           aria-label={`Antwort vorlesen (${backLang})`}
-                          style={{ background: 'none', border: 'none', cursor: 'pointer', color: T.inkSoft, marginTop: SPACE.sm, padding: 6 }}>
+                          style={{ background: 'none', border: 'none', cursor: 'pointer', color: T.textSecondary, marginTop: SPACE.sm, padding: 6 }}>
                           <Volume2 size={18} />
                         </button>
                         {current.type === 'vocab' && displayExample && (
-                          <div style={{ ...typoBody(), color: T.inkSoft, marginTop: SPACE.sm }}>{displayExample}</div>
+                          <div style={{ ...typoBody(), color: T.textSecondary, marginTop: SPACE.sm }}>{displayExample}</div>
                         )}
                       </div>
                     )}
@@ -634,7 +634,7 @@ export default function VokabelTrainer() {
             {/* Aktionsleiste unten - dort, wo der Daumen ohnehin liegt */}
             <div style={{
               flexShrink: 0, padding: `${SPACE.lg}px ${SPACE.lg}px calc(${SPACE.lg}px + env(safe-area-inset-bottom))`,
-              ...divider(T), background: T.bgElev,
+              ...divider(T), background: T.surfaceElevated,
             }}>
               <div style={{ maxWidth: 520, margin: '0 auto' }}>
                 {!revealed ? (
@@ -660,10 +660,10 @@ export default function VokabelTrainer() {
                 ) : (
                   <div className="rise-in" style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: SPACE.sm }}>
                     {[
-                      ['again', 'Nochmal', T.danger, T.dangerSoft, '1'],
-                      ['hard', 'Schwer', T.gold, T.goldSoft, '2'],
+                      ['again', 'Nochmal', T.error, T.errorSoft, '1'],
+                      ['hard', 'Schwer', T.warning, T.warningSoft, '2'],
                       ['good', 'Gut', T.success, T.successSoft, '3'],
-                      ['easy', 'Einfach', T.accent, T.accentSoft, '4'],
+                      ['easy', 'Einfach', T.primary, T.primarySoft, '4'],
                     ].map(([key, label, color, bg, num]) => (
                       <button key={key} className="press" onClick={() => submitRating(key)} style={ratingBtn(color, bg)}>
                         {label}<span className="mono" style={{ fontSize: FONT.xs, opacity: .65 }}>{num}</span>
@@ -679,7 +679,7 @@ export default function VokabelTrainer() {
         {toast && (
           <div style={{
             position: 'fixed', bottom: `calc(120px + env(safe-area-inset-bottom))`, left: '50%', transform: 'translateX(-50%)',
-            background: T.ink, color: T.bg, padding: `${SPACE.md}px ${SPACE.xl}px`, borderRadius: RADIUS.pill,
+            background: T.textPrimary, color: T.background, padding: `${SPACE.md}px ${SPACE.xl}px`, borderRadius: RADIUS.pill,
             fontSize: FONT.md, maxWidth: '90vw', textAlign: 'center', boxShadow: T.shadowLift, zIndex: 50,
           }}>
             {toast}
@@ -698,23 +698,23 @@ export default function VokabelTrainer() {
 
   return (
     <div style={{
-      background: T.bg, color: T.ink, minHeight: '100%', width: '100%', overflowX: 'hidden',
+      background: T.background, color: T.textPrimary, minHeight: '100%', width: '100%', overflowX: 'hidden',
       fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Inter, sans-serif", transition: 'background .25s, color .25s',
     }}>
       <style>{globalCss}</style>
 
       {/* Kopfzeile */}
-      <div style={{ borderBottom: `1px solid ${T.hairline}`, position: 'sticky', top: 0, background: hexToRgba(T.bg, .92), backdropFilter: 'blur(10px)', zIndex: 10 }}>
+      <div style={{ borderBottom: `1px solid ${T.hairline}`, position: 'sticky', top: 0, background: hexToRgba(T.background, .92), backdropFilter: 'blur(10px)', zIndex: 10 }}>
         <div style={{
           maxWidth: 980, margin: '0 auto',
           padding: `calc(${SPACE.md}px + env(safe-area-inset-top)) ${SPACE.lg}px ${SPACE.md}px`,
           display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: SPACE.md,
         }}>
           <button className="brand" onClick={() => setView('dashboard')} style={{
-            background: 'none', border: 'none', cursor: 'pointer', color: T.ink, padding: 0,
+            background: 'none', border: 'none', cursor: 'pointer', color: T.textPrimary, padding: 0,
             ...typoH1(), display: 'flex', alignItems: 'center', gap: SPACE.sm, whiteSpace: 'nowrap',
           }}>
-            <Layers size={20} color={T.accent} />
+            <Layers size={20} color={T.primary} />
             <span>Sprachen<span className="brand-full"> lernen</span></span>
           </button>
 
@@ -725,8 +725,8 @@ export default function VokabelTrainer() {
                   style={{
                     display: 'flex', alignItems: 'center', gap: SPACE.xs, padding: `${SPACE.sm}px ${SPACE.md}px`, borderRadius: RADIUS.pill,
                     border: 'none', cursor: 'pointer', ...typoSecondary(),
-                    background: view === key ? T.accentSoft : 'transparent',
-                    color: view === key ? T.accent : T.inkSoft, transition: 'background .15s, color .15s',
+                    background: view === key ? T.primarySoft : 'transparent',
+                    color: view === key ? T.primary : T.textSecondary, transition: 'background .15s, color .15s',
                   }}>
                   <Icon size={16} /> {label}
                 </button>
@@ -735,7 +735,7 @@ export default function VokabelTrainer() {
             <SyncBadge T={T} state={sync.syncState} onClick={() => setView('account')} />
             <button className="press" onClick={() => setTheme(t => t === 'light' ? 'dark' : 'light')}
               aria-label="Design wechseln"
-              style={{ padding: 9, borderRadius: RADIUS.pill, border: `1px solid ${T.border}`, background: T.bgElev, cursor: 'pointer', color: T.ink, display: 'flex' }}>
+              style={{ padding: 9, borderRadius: RADIUS.pill, border: `1px solid ${T.border}`, background: T.surfaceElevated, cursor: 'pointer', color: T.textPrimary, display: 'flex' }}>
               {theme === 'light' ? <Moon size={16} /> : <Sun size={16} />}
             </button>
           </div>
@@ -745,13 +745,13 @@ export default function VokabelTrainer() {
       <div className="page">
 
         {storageWarning && (
-          <div style={{ background: T.dangerSoft, color: T.danger, border: `1px solid ${T.danger}`, borderRadius: RADIUS.lg, padding: `${SPACE.md}px ${SPACE.lg}px`, marginBottom: SPACE.lg, ...typoBody() }}>
+          <div style={{ background: T.errorSoft, color: T.error, border: `1px solid ${T.error}`, borderRadius: RADIUS.lg, padding: `${SPACE.md}px ${SPACE.lg}px`, marginBottom: SPACE.lg, ...typoBody() }}>
             {storageWarning}
           </div>
         )}
 
         {sync.accountConflict && (
-          <div style={{ background: T.goldSoft, color: T.ink, border: `1px solid ${T.gold}`, borderRadius: RADIUS.lg, padding: `${SPACE.lg}px`, marginBottom: SPACE.lg, ...typoBody('lg') }}>
+          <div style={{ background: T.warningSoft, color: T.textPrimary, border: `1px solid ${T.warning}`, borderRadius: RADIUS.lg, padding: `${SPACE.lg}px`, marginBottom: SPACE.lg, ...typoBody('lg') }}>
             <strong>Anderes Konto erkannt.</strong> Auf diesem Gerät liegen
             {' '}{sync.accountConflict.cardCount} Karte(n), die zu einem anderen Konto gehören.
             Sollen sie in das jetzt angemeldete Konto übernommen werden?
@@ -759,7 +759,7 @@ export default function VokabelTrainer() {
               <button className="press" onClick={() => sync.resolveAccountConflict(true)} style={btnPrimary(T, 'sm')}>Übernehmen</button>
               <button className="press" onClick={() => sync.resolveAccountConflict(false)} style={btnSecondary(T, 'sm')}>Nicht übernehmen</button>
             </div>
-            <div style={{ fontSize: FONT.xs, color: T.inkSoft, marginTop: SPACE.sm }}>
+            <div style={{ fontSize: FONT.xs, color: T.textSecondary, marginTop: SPACE.sm }}>
               Eine Sicherungskopie des lokalen Standes wurde vorher automatisch angelegt.
             </div>
           </div>
@@ -779,20 +779,20 @@ export default function VokabelTrainer() {
             <div style={{ marginBottom: SPACE.xxxl }}>
               <div className="hero">
                 <ProgressRing
-                  percent={dayPercent} track={T.accentSoft} color={T.accent}
+                  percent={dayPercent} track={T.primarySoft} color={T.primary}
                   size={148} stroke={11}
                 >
-                  <div className="mono" style={{ ...typoNumber('hero'), color: dueCards.length > 0 ? T.accent : T.inkSoft }}>
+                  <div className="mono" style={{ ...typoNumber('hero'), color: dueCards.length > 0 ? T.primary : T.textSecondary }}>
                     {dueCards.length}
                   </div>
-                  <div style={{ fontSize: FONT.sm, color: T.inkSoft }}>fällig</div>
+                  <div style={{ fontSize: FONT.sm, color: T.textSecondary }}>fällig</div>
                 </ProgressRing>
 
                 <div className="hero-actions">
                   <div style={{ ...typoDisplay(), marginBottom: SPACE.xs }}>
                     {dueCards.length > 0 ? 'Bereit zum Lernen' : reviewsToday > 0 ? 'Für heute erledigt' : 'Nichts fällig'}
                   </div>
-                  <div style={{ color: T.inkSoft, ...typoBody('lg'), marginBottom: SPACE.lg }}>
+                  <div style={{ color: T.textSecondary, ...typoBody('lg'), marginBottom: SPACE.lg }}>
                     {dueCards.length > 0
                       ? <>{newCardsCount} neu · {reviewCount} Wiederholung{reviewCount !== 1 ? 'en' : ''}{reviewsToday > 0 ? ` · ${reviewsToday} heute geschafft` : ''}</>
                       : reviewsToday > 0
@@ -820,17 +820,17 @@ export default function VokabelTrainer() {
                 obwohl sie nur eine Zeile Information sind. */}
             <div style={{ display: 'flex', gap: SPACE.xl, marginBottom: SPACE.xxxl, flexWrap: 'wrap' }}>
               {[
-                [<Flame size={15} key="i" />, 'Streak', `${streak}`, streak > 0 ? T.danger : T.inkSoft, streak === 1 ? 'Tag' : 'Tage'],
-                [null, 'Gelernt', `${learnedCount}`, T.ink, `von ${cards.length}`],
+                [<Flame size={15} key="i" />, 'Streak', `${streak}`, streak > 0 ? T.error : T.textSecondary, streak === 1 ? 'Tag' : 'Tage'],
+                [null, 'Gelernt', `${learnedCount}`, T.textPrimary, `von ${cards.length}`],
                 [null, 'Trefferquote', `${successRate}`, T.success, '%'],
               ].map(([icon, label, val, color, unit]) => (
                 <div key={label} style={{ flex: 1, minWidth: 90 }}>
-                  <div style={{ fontSize: FONT.xs, color: T.inkSoft, marginBottom: SPACE.xs, display: 'flex', alignItems: 'center', gap: SPACE.xs }}>
+                  <div style={{ fontSize: FONT.xs, color: T.textSecondary, marginBottom: SPACE.xs, display: 'flex', alignItems: 'center', gap: SPACE.xs }}>
                     {icon}{label}
                   </div>
                   <div style={{ display: 'flex', alignItems: 'baseline', gap: SPACE.xs }}>
                     <span className="mono" style={{ ...typoNumber(), color }}>{val}</span>
-                    <span style={{ ...typoCaption(), color: T.inkSoft }}>{unit}</span>
+                    <span style={{ ...typoCaption(), color: T.textSecondary }}>{unit}</span>
                   </div>
                 </div>
               ))}
@@ -840,12 +840,12 @@ export default function VokabelTrainer() {
               <div style={{ minWidth: 0 }}>
                 <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: SPACE.md, gap: SPACE.sm }}>
                   <div style={{ ...typoH2() }}>Kartenboxen</div>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: SPACE.sm, fontSize: FONT.sm, color: T.inkSoft }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: SPACE.sm, fontSize: FONT.sm, color: T.textSecondary }}>
                     Neu/Tag:
                     <input
                       type="number" min={0} value={newCardsPerDay}
                       onChange={e => setNewCardsPerDay(Math.max(0, Number(e.target.value) || 0))}
-                      style={{ width: 52, padding: `${SPACE.xs}px ${SPACE.sm}px`, borderRadius: RADIUS.sm, border: `1px solid ${T.border}`, background: T.bgElev, color: T.ink, fontSize: FONT.sm, textAlign: 'center' }}
+                      style={{ width: 52, padding: `${SPACE.xs}px ${SPACE.sm}px`, borderRadius: RADIUS.sm, border: `1px solid ${T.border}`, background: T.surfaceElevated, color: T.textPrimary, fontSize: FONT.sm, textAlign: 'center' }}
                     />
                     <span style={{ whiteSpace: 'nowrap' }}>· {newIntroducedToday} heute</span>
                   </label>
@@ -855,8 +855,9 @@ export default function VokabelTrainer() {
                     die Kartenboxen gehoeren zusammen und werden auch so gelesen. */}
                 <div style={{ display: 'flex', flexDirection: 'column' }}>
                   {decks.map((d, i) => {
-                    const color = d.type === 'gap' ? T.gold : T.accent;
-                    const soft = d.type === 'gap' ? T.goldSoft : T.accentSoft;
+                    // Satz- und Vokabelboxen unterscheiden sich am Symbol, nicht an
+                    // der Farbe: Gruen gehoert dem Fortschritt und dem faelligen
+                    // Stand, nicht der Kategorie.
                     const progress = d.total > 0 ? Math.round((d.learned / d.total) * 100) : 0;
                     return (
                       <div key={d.key} className="row-link" style={{
@@ -864,19 +865,19 @@ export default function VokabelTrainer() {
                         ...(i > 0 ? divider(T) : null),
                       }}>
                         <div className="deck-head" style={{ display: 'flex', alignItems: 'center', gap: SPACE.md, marginBottom: SPACE.md }}>
-                          <div style={{ width: 40, height: 40, borderRadius: RADIUS.md, background: soft, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                            {d.type === 'gap' ? <PenLine size={18} color={color} /> : <BookOpen size={18} color={color} />}
+                          <div style={{ width: 40, height: 40, borderRadius: RADIUS.md, background: T.surfaceElevated, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                            {d.type === 'gap' ? <PenLine size={18} color={T.textSecondary} /> : <BookOpen size={18} color={T.textSecondary} />}
                           </div>
                           <div style={{ flex: 1, minWidth: 0 }}>
                             <div style={{ ...typoSecondary('lg'), overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.label}</div>
-                            <div className="mono" style={{ fontSize: FONT.xs, color: T.inkSoft, marginTop: 3 }}>
+                            <div className="mono" style={{ fontSize: FONT.xs, color: T.textMuted, marginTop: 3 }}>
                               {d.learned}/{d.total} gelernt · {d.neu} neu
                             </div>
                           </div>
                           <div className="deck-actions">
                             {d.due > 0 && (
                               <span className="mono" style={{
-                                background: soft, color, padding: `${SPACE.xs}px ${SPACE.md}px`, borderRadius: RADIUS.pill,
+                                background: T.primarySoft, color: T.primary, padding: `${SPACE.xs}px ${SPACE.md}px`, borderRadius: RADIUS.pill,
                                 ...typoSecondary('sm'), whiteSpace: 'nowrap',
                               }}>
                                 {d.due} fällig
@@ -888,17 +889,17 @@ export default function VokabelTrainer() {
                             </button>
                           </div>
                         </div>
-                        <div style={{ height: 6, borderRadius: RADIUS.pill, background: soft, overflow: 'hidden' }}>
-                          <div style={{ height: '100%', width: `${progress}%`, borderRadius: RADIUS.pill, background: color, transition: 'width .4s ease' }} />
+                        <div style={{ height: 6, borderRadius: RADIUS.pill, background: T.primarySoft, overflow: 'hidden' }}>
+                          <div style={{ height: '100%', width: `${progress}%`, borderRadius: RADIUS.pill, background: T.primary, transition: 'width .4s ease' }} />
                         </div>
                       </div>
                     );
                   })}
                   {decks.length === 0 && (
                     <div style={{ padding: `${SPACE.xxl}px ${SPACE.lg}px`, textAlign: 'center' }}>
-                      <BookOpen size={30} color={T.inkSoft} style={{ marginBottom: SPACE.md, opacity: .6 }} />
+                      <BookOpen size={30} color={T.textSecondary} style={{ marginBottom: SPACE.md, opacity: .6 }} />
                       <div style={{ ...typoH2(), marginBottom: SPACE.xs }}>Noch keine Karten</div>
-                      <div style={{ color: T.inkSoft, ...typoBody(), marginBottom: SPACE.lg }}>
+                      <div style={{ color: T.textSecondary, ...typoBody(), marginBottom: SPACE.lg }}>
                         Leg deine ersten Vokabeln an – eine Zeile pro Wort.
                       </div>
                       <button className="press" onClick={() => setView('add')} style={btnPrimary(T)}>
@@ -910,13 +911,13 @@ export default function VokabelTrainer() {
 
                 {difficultCards.length > 0 && (
                   <div style={{ marginTop: SPACE.xxxl }}>
-                    <div style={{ ...typoSecondary('sm'), color: T.inkSoft, marginBottom: SPACE.md }}>Fehlerkartei</div>
+                    <div style={{ ...typoSecondary('sm'), color: T.textSecondary, marginBottom: SPACE.md }}>Fehlerkartei</div>
                     {difficultCards.map((c, i) => (
                       <div key={c.id} style={{ display: 'flex', justifyContent: 'space-between', padding: `${SPACE.sm}px 0`, ...(i > 0 ? divider(T) : null), gap: SPACE.md }}>
                         <span style={{ fontSize: FONT.md, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                           {c.type === 'gap' ? revealSentence(c.sentence) : `${c.front} → ${splitAnswer(c.back).answer}`}
                         </span>
-                        <span className="mono" style={{ color: T.danger, fontSize: FONT.sm, flexShrink: 0 }}>{c.wrong}×</span>
+                        <span className="mono" style={{ color: T.error, fontSize: FONT.sm, flexShrink: 0 }}>{c.wrong}×</span>
                       </div>
                     ))}
                   </div>
@@ -928,12 +929,12 @@ export default function VokabelTrainer() {
                 <div style={{ ...typoH2(), marginBottom: SPACE.md }}>Aktivität</div>
                 <div>
                   <div style={{ display: 'flex', alignItems: 'baseline', gap: SPACE.sm, marginBottom: SPACE.xs }}>
-                    <span className="mono" style={{ ...typoNumber(), color: T.accent }}>
+                    <span className="mono" style={{ ...typoNumber(), color: T.primary }}>
                       {heatmap.weeks.flat().reduce((s, d) => s + d.count, 0)}
                     </span>
-                    <span style={{ ...typoCaption(), color: T.inkSoft }}>Wiederholungen</span>
+                    <span style={{ ...typoCaption(), color: T.textSecondary }}>Wiederholungen</span>
                   </div>
-                  <div style={{ fontSize: FONT.xs, color: T.inkSoft, marginBottom: SPACE.lg }}>in den letzten 12 Wochen</div>
+                  <div style={{ fontSize: FONT.xs, color: T.textMuted, marginBottom: SPACE.lg }}>in den letzten 12 Wochen</div>
 
                   <div style={{ overflowX: 'auto', paddingBottom: 2 }}>
                     <div style={{ display: 'flex', gap: 3, width: 'max-content' }}>
@@ -941,7 +942,7 @@ export default function VokabelTrainer() {
                         <div key={wi} style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
                           {week.map(d => {
                             const level = d.count === 0 ? 0 : Math.min(4, Math.ceil((d.count / heatmap.max) * 4));
-                            const bg = level === 0 ? T.heatEmpty : hexToRgba(T.accent, 0.22 + 0.195 * level);
+                            const bg = level === 0 ? T.surface : hexToRgba(T.primary, 0.22 + 0.195 * level);
                             return <div key={d.date} className="stamp" title={`${d.date}: ${d.count} Wiederholungen`}
                               style={{ width: 12, height: 12, borderRadius: 3, background: bg, transition: 'outline-color .15s' }} />;
                           })}
@@ -950,12 +951,12 @@ export default function VokabelTrainer() {
                     </div>
                   </div>
 
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: SPACE.md, fontSize: FONT.xs, color: T.inkSoft }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: SPACE.md, fontSize: FONT.xs, color: T.textMuted }}>
                     <span>12 Wochen</span>
                     <span style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
                       weniger
                       {[0, 1, 2, 3, 4].map(level => (
-                        <span key={level} style={{ width: 10, height: 10, borderRadius: 2, background: level === 0 ? T.heatEmpty : hexToRgba(T.accent, 0.22 + 0.195 * level) }} />
+                        <span key={level} style={{ width: 10, height: 10, borderRadius: 2, background: level === 0 ? T.surface : hexToRgba(T.primary, 0.22 + 0.195 * level) }} />
                       ))}
                       mehr
                     </span>
@@ -971,14 +972,14 @@ export default function VokabelTrainer() {
           <div>
             <div style={{ ...typoDisplay(), marginBottom: SPACE.lg }}>Hinzufügen</div>
 
-            <div style={{ display: 'inline-flex', gap: 3, marginBottom: SPACE.xl, padding: 3, background: T.bgElev, border: `1px solid ${T.border}`, borderRadius: RADIUS.pill }}>
+            <div style={{ display: 'inline-flex', gap: 3, marginBottom: SPACE.xl, padding: 3, background: T.surfaceElevated, border: `1px solid ${T.border}`, borderRadius: RADIUS.pill }}>
               {[['vocab', 'Vokabeln', BookOpen], ['gap', 'Sätze', PenLine]].map(([key, label, Icon]) => (
                 <button key={key} className="press" onClick={() => setAddTab(key)}
                   style={{
                     display: 'flex', alignItems: 'center', gap: SPACE.xs, padding: `${SPACE.sm}px ${SPACE.lg}px`,
                     border: 'none', borderRadius: RADIUS.pill, cursor: 'pointer', ...typoSecondary(),
-                    background: addTab === key ? T.accent : 'transparent',
-                    color: addTab === key ? T.accentInk : T.inkSoft, transition: 'background .15s, color .15s',
+                    background: addTab === key ? T.primary : 'transparent',
+                    color: addTab === key ? T.primaryInk : T.textSecondary, transition: 'background .15s, color .15s',
                   }}>
                   <Icon size={15} /> {label}
                 </button>
@@ -987,13 +988,13 @@ export default function VokabelTrainer() {
 
             {addTab === 'vocab' && (
               <div style={{ maxWidth: 620 }}>
-                <label style={{ ...typoSecondary('sm'), color: T.inkSoft, display: 'block', marginBottom: SPACE.sm }}>Sprachpaar</label>
+                <label style={{ ...typoSecondary('sm'), color: T.textSecondary, display: 'block', marginBottom: SPACE.sm }}>Sprachpaar</label>
                 <select value={pairIdx} onChange={e => setPairIdx(Number(e.target.value))}
                   style={{ ...inputStyle, maxWidth: 320, marginBottom: SPACE.lg, cursor: 'pointer' }}>
                   {VOCAB_PAIRS.map((p, i) => <option key={p.label} value={i}>{p.label}</option>)}
                 </select>
 
-                <label style={{ ...typoSecondary('sm'), color: T.inkSoft, display: 'block', marginBottom: SPACE.sm }}>Vokabeln</label>
+                <label style={{ ...typoSecondary('sm'), color: T.textSecondary, display: 'block', marginBottom: SPACE.sm }}>Vokabeln</label>
                 <textarea value={addText} onChange={e => setAddText(e.target.value)}
                   placeholder={'casa = Haus\nperro = Hund\ncasa = Haus - Ich benutze ein Haus.'}
                   rows={8}
@@ -1006,7 +1007,7 @@ export default function VokabelTrainer() {
                   </button>
                   <input ref={vocabFileRef} type="file" accept=".txt,.csv" style={{ display: 'none' }} onChange={e => readFileInto(e, setAddText)} />
                 </div>
-                <div style={{ marginTop: SPACE.lg, ...typoBody('sm'), color: T.inkSoft }}>
+                <div style={{ marginTop: SPACE.lg, ...typoBody('sm'), color: T.textSecondary }}>
                   Eine Zeile pro Karte im Format <span className="mono">Wort = Übersetzung</span> (auch Komma oder Semikolon gehen). Optional mit Beispielsatz: <span className="mono">Übersetzung - Beispielsatz</span> (Bindestrich mit Leerzeichen davor und danach, oder <span className="mono">|</span>). Getippt werden muss dann nur die Übersetzung vor dem Strich – der Satz erscheint beim Aufdecken als Kontext. Eine hochgeladene .txt/.csv landet erst im Feld – du kannst sie also vorher prüfen.
                 </div>
               </div>
@@ -1014,13 +1015,13 @@ export default function VokabelTrainer() {
 
             {addTab === 'gap' && (
               <div style={{ maxWidth: 620 }}>
-                <label style={{ ...typoSecondary('sm'), color: T.inkSoft, display: 'block', marginBottom: SPACE.sm }}>Sprache</label>
+                <label style={{ ...typoSecondary('sm'), color: T.textSecondary, display: 'block', marginBottom: SPACE.sm }}>Sprache</label>
                 <select value={sentenceLangIdx} onChange={e => setSentenceLangIdx(Number(e.target.value))}
                   style={{ ...inputStyle, maxWidth: 320, marginBottom: SPACE.lg, cursor: 'pointer' }}>
                   {SENTENCE_LANGS.map(l => <option key={l} value={SENTENCE_LANGS.indexOf(l)}>{l}</option>)}
                 </select>
 
-                <label style={{ ...typoSecondary('sm'), color: T.inkSoft, display: 'block', marginBottom: SPACE.sm }}>Sätze</label>
+                <label style={{ ...typoSecondary('sm'), color: T.textSecondary, display: 'block', marginBottom: SPACE.sm }}>Sätze</label>
                 <textarea value={sentenceText} onChange={e => setSentenceText(e.target.value)}
                   placeholder={'Yo [como] fruta todos los días.\nElla [tiene] veinte años.\nNosotros [vivimos] en Berlín.'}
                   rows={8}
@@ -1033,7 +1034,7 @@ export default function VokabelTrainer() {
                   </button>
                   <input ref={sentenceFileRef} type="file" accept=".txt,.csv" style={{ display: 'none' }} onChange={e => readFileInto(e, setSentenceText)} />
                 </div>
-                <div style={{ marginTop: SPACE.lg, ...typoBody('sm'), color: T.inkSoft }}>
+                <div style={{ marginTop: SPACE.lg, ...typoBody('sm'), color: T.textSecondary }}>
                   Die zu übende Form in <span className="mono">[eckige Klammern]</span> setzen – beim Lernen wird daraus eine Lücke. Kleine Tippfehler werden toleriert. Aktuell eine Lücke pro Zeile.
                 </div>
               </div>
@@ -1048,7 +1049,7 @@ export default function VokabelTrainer() {
 
             <div style={{ display: 'flex', gap: SPACE.sm, marginBottom: SPACE.lg, flexWrap: 'wrap' }}>
               <div style={{ position: 'relative', flex: 1, minWidth: 220 }}>
-                <Search size={16} style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', color: T.inkSoft, pointerEvents: 'none' }} />
+                <Search size={16} style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', color: T.textSecondary, pointerEvents: 'none' }} />
                 <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Suchen…"
                   style={{ ...inputStyle, paddingLeft: 40 }} />
               </div>
@@ -1074,15 +1075,15 @@ export default function VokabelTrainer() {
                 </div>
                 <textarea ref={exportTextareaRef} readOnly value={exportText} rows={5}
                   onFocus={e => e.target.select()}
-                  style={{ ...inputStyle, background: T.bg, fontSize: FONT.xs, fontFamily: "'IBM Plex Mono', monospace", resize: 'vertical' }} />
+                  style={{ ...inputStyle, background: T.background, fontSize: FONT.xs, fontFamily: "'IBM Plex Mono', monospace", resize: 'vertical' }} />
                 <div style={{ display: 'flex', gap: SPACE.md, marginTop: SPACE.md, alignItems: 'center', flexWrap: 'wrap' }}>
                   <button className="press" onClick={copyExportText} style={btnPrimary(T)}>Kopieren</button>
-                  <span style={{ fontSize: FONT.sm, color: T.inkSoft }}>z. B. in eine Notiz-App einfügen und aufbewahren.</span>
+                  <span style={{ fontSize: FONT.sm, color: T.textSecondary }}>z. B. in eine Notiz-App einfügen und aufbewahren.</span>
                 </div>
               </div>
             )}
 
-            <div style={{ fontSize: FONT.sm, color: T.inkSoft, marginBottom: SPACE.md }}>{filtered.length} Karte(n)</div>
+            <div style={{ fontSize: FONT.sm, color: T.textSecondary, marginBottom: SPACE.md }}>{filtered.length} Karte(n)</div>
             {/* Auch hier eine Liste statt vieler Einzelkarten - bei hunderten
                 Eintraegen waere jede eigene Umrandung nur Unruhe. */}
             <div style={{ display: 'flex', flexDirection: 'column' }}>
@@ -1096,20 +1097,20 @@ export default function VokabelTrainer() {
                     {c.type === 'gap' ? (
                       <div style={{ ...typoSecondary(), overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{revealSentence(c.sentence)}</div>
                     ) : (
-                      <div style={{ ...typoSecondary() }}>{c.front} <span style={{ ...typoBody(), color: T.inkSoft }}>→</span> {splitAnswer(c.back).answer}</div>
+                      <div style={{ ...typoSecondary() }}>{c.front} <span style={{ ...typoBody(), color: T.textSecondary }}>→</span> {splitAnswer(c.back).answer}</div>
                     )}
-                    <div className="mono" style={{ fontSize: FONT.xs, color: T.inkSoft, marginTop: 3 }}>
+                    <div className="mono" style={{ fontSize: FONT.xs, color: T.textMuted, marginTop: 3 }}>
                       {c.type === 'gap' ? `Satz · ${c.language}` : `${c.langA} → ${c.langB}`} · fällig {c.dueDate} · {c.totalReviews || 0}×
                     </div>
                   </div>
                   <button className="press" onClick={() => deleteCard(c.id)} aria-label="Karte löschen"
-                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: T.inkSoft, flexShrink: 0, padding: 6, display: 'flex' }}>
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: T.textSecondary, flexShrink: 0, padding: 6, display: 'flex' }}>
                     <Trash2 size={16} />
                   </button>
                 </div>
               ))}
               {filtered.length === 0 && (
-                <div style={{ color: T.inkSoft, textAlign: 'center', padding: SPACE.xxl }}>
+                <div style={{ color: T.textSecondary, textAlign: 'center', padding: SPACE.xxl }}>
                   Keine Karten gefunden.
                 </div>
               )}
@@ -1121,7 +1122,7 @@ export default function VokabelTrainer() {
               <div style={{ ...typoSecondary(), marginBottom: SPACE.md }}>Sicherung einspielen</div>
               <textarea value={importPasteText} onChange={e => setImportPasteText(e.target.value)} rows={3}
                 placeholder="Gesicherten Text hier einfügen…"
-                style={{ ...inputStyle, background: T.bg, fontSize: FONT.xs, fontFamily: "'IBM Plex Mono', monospace", resize: 'vertical' }} />
+                style={{ ...inputStyle, background: T.background, fontSize: FONT.xs, fontFamily: "'IBM Plex Mono', monospace", resize: 'vertical' }} />
               <button className="press" onClick={importFromPaste} style={{ ...btnSecondary(T), marginTop: SPACE.md, opacity: importPasteText.trim() ? 1 : .5 }} disabled={!importPasteText.trim()}>
                 Einfügen & importieren
               </button>
@@ -1135,7 +1136,7 @@ export default function VokabelTrainer() {
       <div className="nav-bottom" style={{
         position: 'fixed', left: '50%', bottom: `calc(${SPACE.lg}px + env(safe-area-inset-bottom))`,
         transform: 'translateX(-50%)', zIndex: 20,
-        background: hexToRgba(T.bgElev, .95), backdropFilter: 'blur(12px)',
+        background: hexToRgba(T.surfaceElevated, .95), backdropFilter: 'blur(12px)',
         border: `1px solid ${T.border}`, borderRadius: RADIUS.pill,
         boxShadow: T.shadowLift, padding: SPACE.xs,
       }}>
@@ -1147,8 +1148,8 @@ export default function VokabelTrainer() {
                 style={{
                   display: 'flex', alignItems: 'center', gap: SPACE.xs, padding: `${SPACE.sm}px ${SPACE.md}px`,
                   borderRadius: RADIUS.pill, border: 'none', cursor: 'pointer', whiteSpace: 'nowrap',
-                  background: active ? T.accentSoft : 'transparent',
-                  color: active ? T.accent : T.inkSoft, ...typoSecondary('sm'),
+                  background: active ? T.primarySoft : 'transparent',
+                  color: active ? T.primary : T.textSecondary, ...typoSecondary('sm'),
                   transition: 'background .15s, color .15s',
                 }}>
                 <Icon size={17} strokeWidth={active ? 2.3 : 1.9} /> {label}
@@ -1161,7 +1162,7 @@ export default function VokabelTrainer() {
       {toast && (
         <div style={{
           position: 'fixed', bottom: `calc(${NAVBAR_H + SPACE.lg}px + env(safe-area-inset-bottom))`, left: '50%', transform: 'translateX(-50%)',
-          background: T.ink, color: T.bg, padding: `${SPACE.md}px ${SPACE.xl}px`, borderRadius: RADIUS.pill,
+          background: T.textPrimary, color: T.background, padding: `${SPACE.md}px ${SPACE.xl}px`, borderRadius: RADIUS.pill,
           fontSize: FONT.md, maxWidth: '90vw', textAlign: 'center', boxShadow: T.shadowLift, zIndex: 30,
         }}>
           {toast}

@@ -2,8 +2,13 @@
 // Wird von App.jsx und vom Anmelde-Bildschirm gemeinsam genutzt.
 
 export function hexToRgba(hex, alpha) {
-  const h = hex.replace('#', '');
-  const bigint = parseInt(h.length === 3 ? h.split('').map(x => x + x).join('') : h, 16);
+  let h = hex.replace('#', '');
+  if (h.length === 3) h = h.split('').map(x => x + x).join('');
+  // Achtstellige Werte tragen ihr eigenes Alpha. Ungekuerzt wanderte es in die
+  // Bit-Verschiebung und lieferte eine voellig andere Farbe - die Palette hatte
+  // schon einmal einen solchen Wert.
+  if (h.length === 8) h = h.slice(0, 6);
+  const bigint = parseInt(h, 16);
   const r = (bigint >> 16) & 255, g = (bigint >> 8) & 255, b = bigint & 255;
   return `rgba(${r},${g},${b},${alpha})`;
 }
@@ -23,37 +28,58 @@ export const FONT = { xs: 11, sm: 12, base: 13, md: 14, lg: 16, xl: 18, xxl: 22,
 // Navigation nichts verdeckt - deshalb an einer Stelle definiert.
 export const NAVBAR_H = 84;
 
-// ---------- Sprachpass-Farbwelt ----------
+// ---------- Farbsystem ----------
+// Jede Farbe hat eine Rolle, und der Name sagt sie. Wer einen Ton braucht, sucht
+// die Rolle - nicht einen Farbnamen, der zufaellig passt. Genau daran ist die
+// Vorgaengerpalette gescheitert: "gold" trug gleichzeitig die Warnung und die
+// Kategorie der Satzkarten, und drei Toene waren gar nicht mehr in Gebrauch.
+//
+// Beide Designs fuehren dieselben Schluessel - fehlt einer, ergibt der Zugriff
+// still `undefined` und die Farbe verschwindet, ohne dass der Build etwas merkt.
+//
+//   background       Seitengrund
+//   surface          ruhige Flaeche darauf
+//   surfaceElevated  abgehobene Flaeche (Lernkarte, schwebende Navigation)
+//   primary          Hauptaktion, aktiver Zustand, Fortschritt
+//   primarySoft      getoente Flaeche dazu
+//   primaryInk       Schrift AUF primary
+//   textPrimary/-Secondary/-Muted   drei Stufen Lesbarkeit
+//   border           Rand von Eingabefeldern und Knoepfen
+//   hairline         Trennlinie zwischen Zeilen und Abschnitten
+//   success/warning/error (+ …Soft)  Rueckmeldung
+//
+// Gruen bleibt der Hauptaktion, dem aktiven Zustand, dem Fortschritt und dem
+// Erfolg vorbehalten. Kategorien werden ueber ihr Symbol unterschieden, nicht
+// ueber einen eigenen Farbton.
 export const THEMES = {
   light: {
-    bg: '#F4F6F3', bgElev: '#FFFFFF', ink: '#131815', inkSoft: '#69736C',
-    // hairline traegt Trennlinien und Strukturkanten. Deutlich schwaecher als
-    // border, das den Eingabefeldern und Knoepfen vorbehalten bleibt - dort ist
-    // ein sichtbarer Rand eine Bedienhilfe, zwischen zwei Listenzeilen nicht.
-    border: '#E2E7DF', hairline: '#ECEFE9', accent: '#0F7A5A', accentSoft: '#E2F2EA', accentInk: '#FFFFFF',
-    accentDeep: '#0A5F46',
-    gold: '#B07C2C', goldSoft: '#FBF0DC',
-    blue: '#2F5488', blueSoft: '#E7EDF6',
-    danger: '#B23A4B', dangerSoft: '#FBE6E9',
-    success: '#1F8A5F', successSoft: '#E2F3EA',
-    heatEmpty: '#E7EBE5',
-    shadow: '0 1px 3px rgba(18,28,22,.06)',
-    // Erhabene Flaechen, die sich vom Untergrund abheben sollen (Hero, Lernkarte).
-    shadowLift: '0 2px 6px rgba(18,28,22,.08)',
+    background: '#F5F7F5', surface: '#FBFCFB', surfaceElevated: '#FFFFFF',
+    textPrimary: '#111714', textSecondary: '#5C665F', textMuted: '#838D86',
+    // border traegt die Raender von Eingabefeldern und Knoepfen - dort ist ein
+    // sichtbarer Rand eine Bedienhilfe. hairline traegt Trennlinien zwischen
+    // Zeilen und Abschnitten und ist deutlich schwaecher.
+    border: '#DFE5E0', hairline: '#ECEFEA',
+    // Im hellen Design bestimmt nicht der Seitengrund die noetige Tiefe, sondern
+    // die weiche Flaeche der Bewertungsknoepfe: darauf steht die Beschriftung im
+    // selben Ton. Diese Werte tragen beides - weisse Schrift auf der vollen
+    // Flaeche und der eigene Ton auf der weichen.
+    primary: '#0A7550', primarySoft: '#D2EDE0', primaryInk: '#FFFFFF',
+    success: '#107650', successSoft: '#E1F2E9',
+    warning: '#946226', warningSoft: '#F9EFDB',
+    error: '#B2384A', errorSoft: '#FBE5E8',
+    shadowLift: '0 2px 8px rgba(18,28,22,.08)',
   },
   dark: {
-    bg: '#0D110F', bgElev: '#161C19', ink: '#ECEFEA', inkSoft: '#8F9992',
-    // Der helle Akzent im dunklen Design traegt weissen Text nicht - darauf
-    // gehoert dunkle Schrift, sonst ist der Hauptknopf kaum lesbar.
-    border: '#253029', hairline: '#1B211D', accent: '#3FC08D', accentSoft: '#15332690', accentInk: '#08120D',
-    accentDeep: '#63D6A6',
-    gold: '#DDA95C', goldSoft: '#2E2411',
-    blue: '#7FA0CC', blueSoft: '#1B2735',
-    danger: '#E68C98', dangerSoft: '#37191E',
-    success: '#4FC792', successSoft: '#102A1F',
-    heatEmpty: '#1C231E',
-    shadow: '0 1px 3px rgba(0,0,0,.2)',
-    shadowLift: '0 2px 6px rgba(0,0,0,.25)',
+    background: '#080B0A', surface: '#0F1412', surfaceElevated: '#151B18',
+    textPrimary: '#E8EDEA', textSecondary: '#8E9A94', textMuted: '#626D67',
+    border: '#212B25', hairline: '#171E1A',
+    // Der helle Gruenton traegt keine weisse Schrift - darauf gehoert dunkle,
+    // sonst ist der Hauptknopf kaum lesbar. Dafuer ist primaryInk da.
+    primary: '#34D399', primarySoft: '#15362A', primaryInk: '#04140D',
+    success: '#2FBF88', successSoft: '#0E2419',
+    warning: '#E0A94F', warningSoft: '#2A2113',
+    error: '#E5707C', errorSoft: '#2A1518',
+    shadowLift: '0 2px 8px rgba(0,0,0,.35)',
   },
 };
 
@@ -67,7 +93,7 @@ const BTN_SIZES = {
 
 export function btnPrimary(T, size = 'md') {
   return {
-    background: T.accent, color: T.accentInk, border: 'none', borderRadius: RADIUS.pill,
+    background: T.primary, color: T.primaryInk, border: 'none', borderRadius: RADIUS.pill,
     fontWeight: 600, cursor: 'pointer', display: 'inline-flex', alignItems: 'center',
     justifyContent: 'center', gap: 8, transition: 'filter .15s, transform .1s',
     ...BTN_SIZES[size],
@@ -75,7 +101,7 @@ export function btnPrimary(T, size = 'md') {
 }
 export function btnSecondary(T, size = 'md') {
   return {
-    background: T.bgElev, color: T.ink, border: `1px solid ${T.border}`, borderRadius: RADIUS.pill,
+    background: T.surfaceElevated, color: T.textPrimary, border: `1px solid ${T.border}`, borderRadius: RADIUS.pill,
     fontWeight: 600, cursor: 'pointer', display: 'inline-flex', alignItems: 'center',
     justifyContent: 'center', gap: 8, transition: 'border-color .15s, transform .1s',
     ...BTN_SIZES[size],
@@ -85,7 +111,7 @@ export function btnSecondary(T, size = 'md') {
 // oder "alle wiederholen", die bisher an jeder Stelle einzeln inline gebaut wurden.
 export function btnGhost(T, size = 'md') {
   return {
-    background: 'none', border: 'none', color: T.inkSoft, cursor: 'pointer', padding: 0,
+    background: 'none', border: 'none', color: T.textSecondary, cursor: 'pointer', padding: 0,
     fontWeight: 500, display: 'inline-flex', alignItems: 'center', gap: 4,
     fontSize: size === 'sm' ? FONT.xs : FONT.sm,
   };
@@ -103,15 +129,18 @@ export function ratingBtn(color, bg) {
 // und keinen Schatten mehr: zwei Mittel fuer dieselbe Abgrenzung sind eines zu viel.
 export function surface(T, { lift = false } = {}) {
   return {
-    background: T.bgElev, border: `1px solid ${T.hairline}`, borderRadius: RADIUS.lg,
+    background: T.surfaceElevated, border: `1px solid ${T.hairline}`, borderRadius: RADIUS.lg,
     ...(lift ? { boxShadow: T.shadowLift } : null),
   };
 }
 
 // Flaeche ganz ohne Rand - hebt sich allein durch den Untergrund ab. Fuer Bereiche,
 // die eingeblendet werden und deshalb Abgrenzung brauchen, ohne als Kasten zu wirken.
+// Nimmt die mittlere Ebene: abgehoben ist nur, was wirklich obenauf liegt.
+// (Die Funktion surface() oben und das Token T.surface sind zweierlei - jene baut
+// eine Karte, dieses ist die Farbe der ruhigen Flaeche.)
 export function surfaceSoft(T) {
-  return { background: T.bgElev, borderRadius: RADIUS.lg };
+  return { background: T.surface, borderRadius: RADIUS.lg };
 }
 
 // Trennlinie zwischen zwei Zeilen einer Liste. Ersetzt die Kaesten um jede einzelne
