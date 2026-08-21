@@ -70,22 +70,24 @@ export const THEMES = {
     shadowLift: '0 2px 8px rgba(18,28,22,.08)',
   },
   dark: {
-    // Sehr dunkles Gruen-Grau, bewusst kein reines Schwarz: der leichte Farbstich
-    // nimmt dem Grund die Haerte. Die beiden Flaechen liegen nur knapp darueber -
-    // sie sollen sich abheben, nicht auffallen.
-    background: '#0C110F', surface: '#121815', surfaceElevated: '#171E1B',
-    // Warmes Off-White statt hartem Reinweiss, Sekundaertext gedaempft mit
-    // leicht gruenlichem Charakter - das haelt die Flaeche ruhig.
-    textPrimary: '#EBE9E4', textSecondary: '#8B9791', textMuted: '#616C66',
-    // Kaum sichtbar, absichtlich: die Gliederung traegt der Abstand.
-    border: '#1E2622', hairline: '#171D1A',
-    // Kraeftiges Emerald, aber kein Neon. Der Ton traegt keine weisse Schrift -
-    // darauf gehoert dunkle, sonst ist der Hauptknopf kaum lesbar (primaryInk).
-    primary: '#3AC98F', primarySoft: '#163027', primaryInk: '#04140D',
-    success: '#34BE88', successSoft: '#12281D',
-    warning: '#DDA55C', warningSoft: '#28200F',
-    error: '#E0808A', errorSoft: '#281619',
-    shadowLift: '0 2px 8px rgba(0,0,0,.35)',
+    // Alle Werte aus der Vorlage gemessen. Der Grund ist fast schwarz mit einem
+    // Hauch Blaugruen (Blau minimal ueber Gruen ueber Rot) - dieser Stich nimmt
+    // ihm die Haerte, ohne als Farbe aufzufallen. Die Flaechen liegen knapp
+    // darueber und unterscheiden sich nur um wenige Stufen.
+    background: '#040A0B', surface: '#0D1213', surfaceElevated: '#101718',
+    // Neutral bis leicht kuehl, kein warmes Weiss - so steht es in der Vorlage.
+    // Der Sekundaerton dort ist #696F70 und erreicht nur 3.9:1; er waere auf
+    // diesem Grund nicht mehr lesbar, deshalb hier eine Stufe heller.
+    textPrimary: '#F1F2F2', textSecondary: '#828A8B', textMuted: '#646C6D',
+    border: '#1B2223', hairline: '#141A1B',
+    // Der Akzent traegt keine weisse Schrift - darauf gehoert dunkle (primaryInk).
+    primary: '#29C08B', primarySoft: '#0E3829', primaryInk: '#04140D',
+    // Die getoenten Flaechen der Bewertung stammen ebenfalls aus der Vorlage.
+    // Sie sind sehr dunkel: die Farbe kennzeichnet, ohne die Leiste bunt zu machen.
+    success: '#2BB584', successSoft: '#0C1C18',
+    warning: '#DDA55C', warningSoft: '#1C1B14',
+    error: '#E5757E', errorSoft: '#1D1214',
+    shadowLift: '0 2px 8px rgba(0,0,0,.4)',
   },
 };
 
