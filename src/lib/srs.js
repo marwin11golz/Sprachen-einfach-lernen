@@ -111,6 +111,24 @@ export function splitAnswer(text) {
   return { answer, example: example || null };
 }
 
+// Beide Seiten einer Karte zerlegt: jede Sprache traegt ihren eigenen
+// Beispielsatz. "casa | Vivo en una casa. = Haus | Ich wohne in einem Haus."
+// ergibt vorne das spanische, hinten das deutsche Paar.
+//
+// Lueckensaetze bleiben unzerlegt: dort waere ein Gedankenstrich mitten im Satz
+// ("Yo ▁▁▁ fruta - y mi hermana come pan.") ein Trenner, und die zweite
+// Satzhaelfte verschwaende aus der Frage. Das ist schon einmal passiert.
+export function cardSides(card) {
+  if (!card) return { front: { answer: '', example: null }, back: { answer: '', example: null } };
+  if (card.type !== 'vocab') {
+    return {
+      front: { answer: card.front ?? '', example: null },
+      back: { answer: card.back ?? '', example: null },
+    };
+  }
+  return { front: splitAnswer(card.front), back: splitAnswer(card.back) };
+}
+
 // Tippfehler-Toleranz beim Abfragen getippter Antworten.
 export function levenshtein(a, b) {
   a = a.trim().toLowerCase(); b = b.trim().toLowerCase();

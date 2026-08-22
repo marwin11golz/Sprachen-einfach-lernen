@@ -6,8 +6,8 @@ import {
 } from 'lucide-react';
 
 import {
-  levenshtein, todayISO,
-  parseGapLine, revealSentence, splitAnswer,
+  levenshtein, todayISO, cardSides,
+  parseGapLine, revealSentence,
   deckKeyOf, deckLabelOf,
   newVocabCard, newGapCard,
   VOCAB_PAIRS, SENTENCE_LANGS, langCodeOf,
@@ -293,23 +293,18 @@ export default function VokabelTrainer() {
   };
 
   // Bei umgedrehter Vokabel werden Vorder- und Rückseite für Anzeige/Prüfung vertauscht.
-  // Ein "|" in der Rückseite trennt die eigentliche Antwort von einem Beispielsatz -
-  // getippt/geprüft wird nur die Antwort, der Beispielsatz ist reiner Kontext beim Aufdecken.
-  const frontRaw = current ? (current.type === 'vocab' && flipped ? current.back : current.front) : '';
-  const backRaw = current ? (current.type === 'vocab' && flipped ? current.front : current.back) : '';
-  // Nur Vokabelkarten kennen die Trennung Antwort/Beispielsatz. Bei einem
-  // Lueckensatz waere ein Gedankenstrich mitten im Satz ("Yo ▁▁▁ fruta - y
-  // mi hermana come pan.") sonst ein Trenner, und die zweite Satzhaelfte
-  // verschwaende aus der Frage.
-  const asIs = (text) => ({ answer: text, example: null });
-  const splitSides = current?.type === 'vocab' ? splitAnswer : asIs;
-  const frontParts = splitSides(frontRaw);
-  const backParts = splitSides(backRaw);
+  // Ein "|" trennt auf jeder Seite die Antwort von ihrem Beispielsatz - getippt
+  // und geprueft wird nur die Antwort.
+  const sides = cardSides(current);
+  // Beim umgedrehten Lernen tauschen die Seiten, der Satz wandert mit seiner
+  // Sprache. So kann der Satz der Rueckseite nicht mehr vorne stehen und die
+  // Antwort verraten.
+  const frontParts = current?.type === 'vocab' && flipped ? sides.back : sides.front;
+  const backParts = current?.type === 'vocab' && flipped ? sides.front : sides.back;
   const displayFront = frontParts.answer;
   const displayBack = backParts.answer;
-  // Der Beispielsatz gehoert zur Karte, nicht zu einer Seite: beim Umdrehen
-  // steht er auf der Vorderseite und wuerde sonst gar nicht mehr auftauchen.
-  const displayExample = backParts.example || frontParts.example;
+  const frontExample = frontParts.example;
+  const backExample = backParts.example;
 
   // Welche Sprache auf welcher Seite steht - entscheidet, wie vorgelesen wird.
   // Bei Lueckensaetzen sind beide Seiten dieselbe Sprache.
@@ -578,18 +573,17 @@ export default function VokabelTrainer() {
           </div>
         ) : (
           <>
-            {/* Frage und Antwort sind zwei getrennte Karten. Die Antwort
-                schiebt sich unter die Frage, statt sie zu verdraengen - beim
-                Nachschlagen will man beides nebeneinander sehen. */}
+            {/* Eine Karte, die umblaettert: vorne die Frage mit dem Satz ihrer
+                Sprache, nach dem Aufdecken die Uebersetzung mit ihrem. Die Frage
+                ist dann nicht mehr zu sehen - wie bei einer echten Karteikarte. */}
             <div style={{
               flex: 1, minHeight: 0, overflowY: 'auto',
               padding: `${SPACE.lg}px ${SPACE.lg}px ${SPACE.xl}px`,
               display: 'flex', flexDirection: 'column', alignItems: 'center',
-              justifyContent: 'flex-start', gap: SPACE.lg,
+              justifyContent: 'flex-start',
             }}>
-              {/* --- Frage --- */}
               <div
-                key={current.id}
+                key={current.id + String(revealed)}
                 className="card-in"
                 onClick={canTapToReveal ? () => setRevealed(true) : undefined}
                 role={canTapToReveal ? 'button' : undefined}
@@ -601,25 +595,58 @@ export default function VokabelTrainer() {
                   ...surface(T), width: '100%', maxWidth: 520, flexShrink: 0,
                   textAlign: 'center', padding: `${SPACE.xxl}px ${SPACE.xl}px`,
                   cursor: canTapToReveal ? 'pointer' : 'default',
+                  // Die aufgedeckte Seite bekommt den Schimmer aus der Akzentfarbe -
+                  // daran ist ohne Lesen zu erkennen, welche Seite oben liegt.
+                  ...(revealed ? { backgroundImage: `linear-gradient(155deg, ${T.primarySoft}, ${T.surfaceElevated} 55%)` } : null),
                 }}>
                 <div style={chipStyle}>
                   {current.type === 'gap'
                     ? `Satz · ${current.language}`
-                    : `${flipped ? current.langB : current.langA} → ${flipped ? current.langA : current.langB}`}
+                    : (revealed
+                        ? (flipped ? current.langA : current.langB)
+                        : `${flipped ? current.langB : current.langA} → ${flipped ? current.langA : current.langB}`)}
                 </div>
 
+                {revealed && isWriteInteraction && (
+                  <div style={{
+                    display: 'inline-flex', alignItems: 'center', gap: SPACE.sm, ...typoSecondary(),
+                    color: writeResult?.ok ? T.success : T.error,
+                    background: writeResult?.ok ? T.successSoft : T.errorSoft,
+                    padding: `${SPACE.sm}px ${SPACE.lg}px`, borderRadius: RADIUS.pill, marginTop: SPACE.lg,
+                  }}>
+                    {writeResult?.ok ? <CheckCircle2 size={17} /> : <XCircle size={17} />}
+                    {writeResult?.ok ? 'Richtig' : 'Nicht ganz'}
+                  </div>
+                )}
+
                 <div style={{ ...(current.type === 'gap' ? typoH2() : typoDisplay()), marginTop: SPACE.lg }}>
-                  {displayFront}
+                  {revealed
+                    ? (current.type === 'gap' ? revealSentence(current.sentence) : displayBack)
+                    : displayFront}
                 </div>
 
                 {(!isWriteInteraction || revealed) && (
                   <div>
                     <button className="press"
-                      onClick={e => { e.stopPropagation(); speak(current.type === 'gap' ? revealSentence(current.sentence) : displayFront, frontLang); }}
-                      aria-label={`Vorlesen (${frontLang})`}
+                      onClick={e => {
+                        e.stopPropagation();
+                        if (current.type === 'gap') speak(revealSentence(current.sentence), revealed ? backLang : frontLang);
+                        else speak(revealed ? displayBack : displayFront, revealed ? backLang : frontLang);
+                      }}
+                      aria-label={revealed ? `Antwort vorlesen (${backLang})` : `Vorlesen (${frontLang})`}
                       style={roundIconBtn}>
                       <Volume2 size={19} />
                     </button>
+                  </div>
+                )}
+
+                {/* Jede Seite zeigt den Satz ihrer eigenen Sprache. */}
+                {(revealed ? backExample : frontExample) && (
+                  <div style={{ marginTop: SPACE.lg, paddingTop: SPACE.lg, ...divider(T) }}>
+                    <div style={chipStyle}><Quote size={12} /> Beispielsatz</div>
+                    <div style={{ ...typoBody('lg'), marginTop: SPACE.md }}>
+                      {revealed ? backExample : frontExample}
+                    </div>
                   </div>
                 )}
 
@@ -641,51 +668,6 @@ export default function VokabelTrainer() {
                   </div>
                 )}
               </div>
-
-              {/* --- Antwort --- */}
-              {revealed && (
-                <div className="rise-in" style={{
-                  ...surface(T), width: '100%', maxWidth: 520, flexShrink: 0,
-                  textAlign: 'center', padding: `${SPACE.xxl}px ${SPACE.xl}px`,
-                  // Der Schimmer kommt aus der Akzentfarbe selbst, kein neuer Ton.
-                  backgroundImage: `linear-gradient(155deg, ${T.primarySoft}, ${T.surfaceElevated} 55%)`,
-                }}>
-                  {isWriteInteraction && (
-                    <div style={{
-                      display: 'inline-flex', alignItems: 'center', gap: SPACE.sm, ...typoSecondary(),
-                      color: writeResult?.ok ? T.success : T.error,
-                      background: writeResult?.ok ? T.successSoft : T.errorSoft,
-                      padding: `${SPACE.sm}px ${SPACE.lg}px`, borderRadius: RADIUS.pill, marginBottom: SPACE.lg,
-                    }}>
-                      {writeResult?.ok ? <CheckCircle2 size={17} /> : <XCircle size={17} />}
-                      {writeResult?.ok ? 'Richtig' : 'Nicht ganz'}
-                    </div>
-                  )}
-
-                  {/* Die Frage steht hier noch einmal - beim Vergleichen will man
-                      nicht zwischen zwei Karten hin und her springen. */}
-                  <div style={{ ...typoSecondary('lg'), color: T.textSecondary }}>{displayFront}</div>
-                  <div style={{ ...typoH2(), marginTop: SPACE.xs }}>
-                    {current.type === 'gap' ? revealSentence(current.sentence) : displayBack}
-                  </div>
-
-                  <div>
-                    <button className="press"
-                      onClick={() => speak(current.type === 'gap' ? revealSentence(current.sentence) : displayBack, backLang)}
-                      aria-label={`Antwort vorlesen (${backLang})`}
-                      style={roundIconBtn}>
-                      <Volume2 size={19} />
-                    </button>
-                  </div>
-
-                  {displayExample && (
-                    <div style={{ marginTop: SPACE.lg, paddingTop: SPACE.lg, ...divider(T) }}>
-                      <div style={chipStyle}><Quote size={12} /> Beispielsatz</div>
-                      <div style={{ ...typoBody('lg'), marginTop: SPACE.md }}>{displayExample}</div>
-                    </div>
-                  )}
-                </div>
-              )}
             </div>
 
             {/* Aktionsleiste unten - dort, wo der Daumen ohnehin liegt */}
@@ -982,7 +964,7 @@ export default function VokabelTrainer() {
                     {difficultCards.map((c, i) => (
                       <div key={c.id} style={{ display: 'flex', justifyContent: 'space-between', padding: `${SPACE.sm}px 0`, ...(i > 0 ? divider(T) : null), gap: SPACE.md }}>
                         <span style={{ fontSize: FONT.md, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                          {c.type === 'gap' ? revealSentence(c.sentence) : `${c.front} → ${splitAnswer(c.back).answer}`}
+                          {c.type === 'gap' ? revealSentence(c.sentence) : `${cardSides(c).front.answer} → ${cardSides(c).back.answer}`}
                         </span>
                         <span className="mono" style={{ color: T.error, fontSize: FONT.sm, flexShrink: 0 }}>{c.wrong}×</span>
                       </div>
@@ -1063,7 +1045,7 @@ export default function VokabelTrainer() {
 
                 <label style={{ ...typoSecondary('sm'), color: T.textSecondary, display: 'block', marginBottom: SPACE.sm }}>Vokabeln</label>
                 <textarea value={addText} onChange={e => setAddText(e.target.value)}
-                  placeholder={'casa = Haus\nperro = Hund\ncasa = Haus - Ich benutze ein Haus.'}
+                  placeholder={'casa = Haus\nperro = Hund | Der Hund schläft.\ncasa | Vivo en una casa. = Haus | Ich wohne in einem Haus.'}
                   rows={8}
                   style={{ ...inputStyle, resize: 'vertical', lineHeight: 1.7, fontFamily: "'IBM Plex Mono', monospace", fontSize: FONT.base }} />
 
@@ -1075,7 +1057,7 @@ export default function VokabelTrainer() {
                   <input ref={vocabFileRef} type="file" accept=".txt,.csv" style={{ display: 'none' }} onChange={e => readFileInto(e, setAddText)} />
                 </div>
                 <div style={{ marginTop: SPACE.lg, ...typoBody('sm'), color: T.textSecondary }}>
-                  Eine Zeile pro Karte im Format <span className="mono">Wort = Übersetzung</span> (auch Komma oder Semikolon gehen). Optional mit Beispielsatz: <span className="mono">Übersetzung - Beispielsatz</span> (Bindestrich mit Leerzeichen davor und danach, oder <span className="mono">|</span>). Getippt werden muss dann nur die Übersetzung vor dem Strich – der Satz erscheint beim Aufdecken als Kontext. Eine hochgeladene .txt/.csv landet erst im Feld – du kannst sie also vorher prüfen.
+                  Eine Zeile pro Karte im Format <span className="mono">Wort = Übersetzung</span> (auch Komma oder Semikolon gehen). Ein Beispielsatz wird mit <span className="mono">|</span> angehängt – oder mit einem Bindestrich, der Leerzeichen davor und danach hat. Jede Seite kann ihren eigenen Satz haben, in ihrer Sprache: <span className="mono">casa | Vivo en una casa. = Haus | Ich wohne in einem Haus.</span> Beim Lernen zeigt jede Seite nur ihren Satz. Getippt werden muss immer nur die Übersetzung, nie der Satz. Eine hochgeladene .txt/.csv landet erst im Feld – du kannst sie also vorher prüfen.
                 </div>
               </div>
             )}
@@ -1164,7 +1146,7 @@ export default function VokabelTrainer() {
                     {c.type === 'gap' ? (
                       <div style={{ ...typoSecondary(), overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{revealSentence(c.sentence)}</div>
                     ) : (
-                      <div style={{ ...typoSecondary() }}>{c.front} <span style={{ ...typoBody(), color: T.textSecondary }}>→</span> {splitAnswer(c.back).answer}</div>
+                      <div style={{ ...typoSecondary() }}>{cardSides(c).front.answer} <span style={{ ...typoBody(), color: T.textSecondary }}>→</span> {cardSides(c).back.answer}</div>
                     )}
                     <div className="mono" style={{ fontSize: FONT.xs, color: T.textMuted, marginTop: 3 }}>
                       {c.type === 'gap' ? `Satz · ${c.language}` : `${c.langA} → ${c.langB}`} · fällig {c.dueDate} · {c.totalReviews || 0}×
