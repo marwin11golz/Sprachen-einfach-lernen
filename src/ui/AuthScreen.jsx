@@ -2,7 +2,7 @@
 // Gestaltung bewusst wie die Kartenboxen im Dashboard.
 
 import React, { useState } from 'react';
-import { CheckCircle2, RefreshCw, LogOut, CloudOff } from 'lucide-react';
+import { CheckCircle2, RefreshCw, LogOut } from 'lucide-react';
 import { btnPrimary, btnSecondary, btnGhost, typoH2, typoBody, typoSecondary, typoCaption, SPACE, RADIUS, FONT } from '../lib/theme.js';
 
 function fmtTime(iso) {
@@ -96,11 +96,6 @@ export default function AuthScreen({
           </button>
         </div>
 
-        <div style={{ ...typoCaption(), color: T.textSecondary, marginTop: 16 }}>
-          Melde dich auf deinem anderen Gerät mit derselben E-Mail an, dann haben
-          beide denselben Stand. Ein zweites Konto wäre ein zweiter, getrennter
-          Kartenstapel.
-        </div>
       </div>
     );
   }
@@ -123,11 +118,6 @@ export default function AuthScreen({
       <div style={{ ...typoH2(), marginBottom: 6 }}>
         {mode === 'signin' ? 'Anmelden' : 'Konto erstellen'}
       </div>
-      <div style={{ ...typoBody(), color: T.textSecondary, marginBottom: 18 }}>
-        Damit Handy und iPad dieselben Vokabeln haben. Ohne Anmeldung funktioniert
-        die App weiter – die Karten bleiben dann nur auf diesem Gerät.
-      </div>
-
       <form onSubmit={submit}>
         <input
           style={input} type="email" required autoComplete="email" inputMode="email"
@@ -169,9 +159,6 @@ export default function AuthScreen({
         </button>
       </div>
 
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6, ...typoCaption(), color: T.textSecondary, marginTop: 18 }}>
-        <CloudOff size={13} /> Ohne Anmeldung: alles bleibt lokal auf diesem Gerät.
-      </div>
     </div>
   );
 }

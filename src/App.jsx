@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   Plus, Search, BarChart3, Layers, CheckCircle2, XCircle, Sun, Moon, X,
   Download, Trash2, Volume2, Upload, BookOpen, PenLine, ChevronRight, Repeat, Flame,
-  MinusCircle, Star, Pointer, Quote,
+  MinusCircle, Star,
 } from 'lucide-react';
 
 import {
@@ -580,7 +580,7 @@ export default function VokabelTrainer() {
               flex: 1, minHeight: 0, overflowY: 'auto',
               padding: `${SPACE.lg}px ${SPACE.lg}px ${SPACE.xl}px`,
               display: 'flex', flexDirection: 'column', alignItems: 'center',
-              justifyContent: 'flex-start',
+              justifyContent: 'center',
             }}>
               <div
                 key={current.id + String(revealed)}
@@ -595,9 +595,7 @@ export default function VokabelTrainer() {
                   ...surface(T), width: '100%', maxWidth: 520, flexShrink: 0,
                   textAlign: 'center', padding: `${SPACE.xxl}px ${SPACE.xl}px`,
                   cursor: canTapToReveal ? 'pointer' : 'default',
-                  // Die aufgedeckte Seite bekommt den Schimmer aus der Akzentfarbe -
-                  // daran ist ohne Lesen zu erkennen, welche Seite oben liegt.
-                  ...(revealed ? { backgroundImage: `linear-gradient(155deg, ${T.primarySoft}, ${T.surfaceElevated} 55%)` } : null),
+                  backgroundImage: `linear-gradient(155deg, ${T.primarySoft}, ${T.surfaceElevated} 55%)`,
                 }}>
                 <div style={chipStyle}>
                   {current.type === 'gap'
@@ -643,18 +641,9 @@ export default function VokabelTrainer() {
                 {/* Jede Seite zeigt den Satz ihrer eigenen Sprache. */}
                 {(revealed ? backExample : frontExample) && (
                   <div style={{ marginTop: SPACE.lg, paddingTop: SPACE.lg, ...divider(T) }}>
-                    <div style={chipStyle}><Quote size={12} /> Beispielsatz</div>
-                    <div style={{ ...typoBody('lg'), marginTop: SPACE.md }}>
+                    <div style={{ ...typoBody('lg'), color: T.textSecondary }}>
                       {revealed ? backExample : frontExample}
                     </div>
-                  </div>
-                )}
-
-                {canTapToReveal && (
-                  <div style={{ marginTop: SPACE.lg }}>
-                    <span style={{ ...chipStyle, background: 'none', color: T.textMuted }}>
-                      <Pointer size={14} /> Tippen zum Aufdecken
-                    </span>
                   </div>
                 )}
 
@@ -695,9 +684,6 @@ export default function VokabelTrainer() {
                   </>
                 ) : (
                   <div className="rise-in">
-                    <div style={{ ...typoCaption(), color: T.textMuted, textAlign: 'center', marginBottom: SPACE.md }}>
-                      Wie gut kanntest du es?
-                    </div>
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: SPACE.sm }}>
                       {[
                         ['again', 'Nochmal', T.error, T.errorSoft, XCircle],
@@ -948,9 +934,6 @@ export default function VokabelTrainer() {
                     <div style={{ padding: `${SPACE.xxl}px ${SPACE.lg}px`, textAlign: 'center' }}>
                       <BookOpen size={30} color={T.textSecondary} style={{ marginBottom: SPACE.md, opacity: .6 }} />
                       <div style={{ ...typoH2(), marginBottom: SPACE.xs }}>Noch keine Karten</div>
-                      <div style={{ color: T.textSecondary, ...typoBody(), marginBottom: SPACE.lg }}>
-                        Leg deine ersten Vokabeln an – eine Zeile pro Wort.
-                      </div>
                       <button className="press" onClick={() => setView('add')} style={btnPrimary(T)}>
                         <Plus size={16} /> Vokabeln anlegen
                       </button>
@@ -1056,9 +1039,6 @@ export default function VokabelTrainer() {
                   </button>
                   <input ref={vocabFileRef} type="file" accept=".txt,.csv" style={{ display: 'none' }} onChange={e => readFileInto(e, setAddText)} />
                 </div>
-                <div style={{ marginTop: SPACE.lg, ...typoBody('sm'), color: T.textSecondary }}>
-                  Eine Zeile pro Karte im Format <span className="mono">Wort = Übersetzung</span> (auch Komma oder Semikolon gehen). Ein Beispielsatz wird mit <span className="mono">|</span> angehängt – oder mit einem Bindestrich, der Leerzeichen davor und danach hat. Jede Seite kann ihren eigenen Satz haben, in ihrer Sprache: <span className="mono">casa | Vivo en una casa. = Haus | Ich wohne in einem Haus.</span> Beim Lernen zeigt jede Seite nur ihren Satz. Getippt werden muss immer nur die Übersetzung, nie der Satz. Eine hochgeladene .txt/.csv landet erst im Feld – du kannst sie also vorher prüfen.
-                </div>
               </div>
             )}
 
@@ -1082,9 +1062,6 @@ export default function VokabelTrainer() {
                     <Upload size={15} /> Datei
                   </button>
                   <input ref={sentenceFileRef} type="file" accept=".txt,.csv" style={{ display: 'none' }} onChange={e => readFileInto(e, setSentenceText)} />
-                </div>
-                <div style={{ marginTop: SPACE.lg, ...typoBody('sm'), color: T.textSecondary }}>
-                  Die zu übende Form in <span className="mono">[eckige Klammern]</span> setzen – beim Lernen wird daraus eine Lücke. Kleine Tippfehler werden toleriert. Aktuell eine Lücke pro Zeile.
                 </div>
               </div>
             )}
@@ -1127,7 +1104,6 @@ export default function VokabelTrainer() {
                   style={{ ...inputStyle, background: T.background, fontSize: FONT.xs, fontFamily: "'IBM Plex Mono', monospace", resize: 'vertical' }} />
                 <div style={{ display: 'flex', gap: SPACE.md, marginTop: SPACE.md, alignItems: 'center', flexWrap: 'wrap' }}>
                   <button className="press" onClick={copyExportText} style={btnPrimary(T)}>Kopieren</button>
-                  <span style={{ fontSize: FONT.sm, color: T.textSecondary }}>z. B. in eine Notiz-App einfügen und aufbewahren.</span>
                 </div>
               </div>
             )}
