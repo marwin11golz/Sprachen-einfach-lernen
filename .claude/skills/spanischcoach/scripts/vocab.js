@@ -226,13 +226,33 @@ function splitAnswer(text) {
   return { answer, example: example || null };
 }
 
+// Beide Seiten zerlegt - jede Sprache traegt ihren eigenen Beispielsatz.
+// Wortgleich mit cardSides() in src/lib/srs.js: stuende der Satz hier in der
+// Frage, fragte der Chat etwas anderes ab als die App.
+//
 // Nur Vokabelkarten kennen die Trennung. Bei einem Lueckensatz waere ein
 // Gedankenstrich im Satz sonst ein Trenner und die zweite Satzhaelfte weg.
-function answerOf(card) {
-  return card.type === 'vocab' ? splitAnswer(card.back).answer : card.back;
+function cardSides(card) {
+  if (!card) return { front: { answer: '', example: null }, back: { answer: '', example: null } };
+  if (card.type !== 'vocab') {
+    return {
+      front: { answer: card.front ?? '', example: null },
+      back: { answer: card.back ?? '', example: null },
+    };
+  }
+  return { front: splitAnswer(card.front), back: splitAnswer(card.back) };
 }
-function exampleOf(card) {
-  return card.type === 'vocab' ? splitAnswer(card.back).example : null;
+
+function frontOf(card) {
+  return cardSides(card).front.answer;
+}
+function answerOf(card) {
+  return cardSides(card).back.answer;
+}
+// Beide Saetze, damit im Chat sichtbar ist, was auf welcher Seite steht.
+function examplesOf(card) {
+  const { front, back } = cardSides(card);
+  return [front.example, back.example].filter(Boolean);
 }
 
 function linesFromArgs(args) {
@@ -258,8 +278,8 @@ function cmdAddVocab(args, dataPath) {
   saveData(dataPath, data);
   console.log(`${added.length} Vokabel(n) hinzugefuegt (${langA} -> ${langB}).`);
   added.forEach(c => {
-    const ex = exampleOf(c);
-    console.log(`  [${c.id}] ${c.front} = ${answerOf(c)}${ex ? `   (Beispiel: ${ex})` : ''}`);
+    const ex = examplesOf(c);
+    console.log(`  [${c.id}] ${frontOf(c)} = ${answerOf(c)}${ex.length ? `   (Beispiel: ${ex.join(' / ')})` : ''}`);
   });
 }
 
@@ -290,7 +310,7 @@ function cmdDue(args, dataPath) {
   if (args.deck) pool = pool.filter(c => deckKeyOf(c) === args.deck || (c.type === 'vocab' ? `${c.langA}->${c.langB}` : c.language) === args.deck);
   if (pool.length === 0) { console.log('Keine Karten gefunden.'); return; }
   for (const c of pool) {
-    const label = c.type === 'gap' ? `[gap/${c.language}] ${c.front}` : `[vocab/${c.langA}->${c.langB}] ${c.front}`;
+    const label = c.type === 'gap' ? `[gap/${c.language}] ${c.front}` : `[vocab/${c.langA}->${c.langB}] ${frontOf(c)}`;
     console.log(`${c.id}\tfaellig ${c.dueDate}\tneu:${c.repetitions === 0}\t${label}`);
   }
 }
@@ -305,7 +325,7 @@ function cmdRate(args, dataPath) {
   data.cards[idx] = updated;
   data.activityLog[todayISO()] = (data.activityLog[todayISO()] || 0) + 1;
   saveData(dataPath, data);
-  console.log(`Aktualisiert: ${updated.type === 'gap' ? updated.sentence : `${updated.front} = ${answerOf(updated)}`}`);
+  console.log(`Aktualisiert: ${updated.type === 'gap' ? updated.sentence : `${frontOf(updated)} = ${answerOf(updated)}`}`);
   console.log(`  naechste Faelligkeit: ${updated.dueDate} (interval ${updated.interval}, ease ${updated.ease.toFixed(2)}, wiederholungen ${updated.repetitions})`);
 }
 
@@ -340,9 +360,9 @@ function cmdList(args, dataPath) {
     cards = cards.filter(c => (c.type === 'gap' ? `${c.sentence} ${c.back}` : `${c.front} ${c.back}`).toLowerCase().includes(q));
   }
   for (const c of cards) {
-    const ex = exampleOf(c);
-    const text = c.type === 'gap' ? c.sentence : `${c.front} = ${answerOf(c)}`;
-    console.log(`${c.id}\t${text}\tfaellig ${c.dueDate}${ex ? `\tBeispiel: ${ex}` : ''}`);
+    const ex = examplesOf(c);
+    const text = c.type === 'gap' ? c.sentence : `${frontOf(c)} = ${answerOf(c)}`;
+    console.log(`${c.id}\t${text}\tfaellig ${c.dueDate}${ex.length ? `\tBeispiel: ${ex.join(' / ')}` : ''}`);
   }
   console.log(`${cards.length} Karte(n).`);
 }

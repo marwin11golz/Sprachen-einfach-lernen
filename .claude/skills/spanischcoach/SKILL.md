@@ -40,6 +40,12 @@ node .claude/skills/spanischcoach/scripts/vocab.js add-vocab --file /pfad/zur/li
   become more efficient.` Statt `|` geht auch ein Binde- oder Gedankenstrich
   **mit Leerzeichen ringsum**. Abgefragt wird dann nur der Teil vor dem
   Trenner – der Satz ist reiner Kontext (siehe „Lerneinheit“ unten).
+- **Jede Seite kann ihren eigenen Satz tragen, in ihrer Sprache:**
+  `casa | Vivo en una casa. = Haus | Ich wohne in einem Haus.` In der App zeigt
+  dann jede Seite der Karte nur ihren Satz. Abgefragt wird weiterhin allein die
+  Übersetzung; im Chat also nach `casa` fragen, nicht nach dem ganzen Feld.
+  `due` und `list` geben die Frage ohne Satz aus und weisen beide Sätze getrennt
+  aus.
 - Für Konjugations-/Lückensätze (die zu übende Form in eckigen Klammern):
 
 ```bash
@@ -65,7 +71,8 @@ Warnung - dem Nutzer kurz erklären, was nicht erkannt wurde, statt es stillschw
    bestehen, das Original toleriert das ebenfalls). Trägt eine Karte einen
    Beispielsatz, zählt **nur die Übersetzung vor dem Trenner** als Antwort -
    den Satz muss der Nutzer nie mitschreiben; er dient zum Auflösen als
-   Kontext. `list` zeigt beides getrennt an. Nach der Auflösung den
+   Kontext. Das gilt auch für die Frageseite: trägt sie einen Satz, wird
+   trotzdem nur das Wort abgefragt. `list` zeigt alles getrennt an. Nach der Auflösung den
    Nutzer wie im Original-App selbst einschätzen lassen ("nochmal" / "schwer"
    / "gut" / "einfach"), oder bei eindeutig richtiger bzw. falscher Antwort
    direkt automatisch als "gut" bzw. "nochmal" werten - je nachdem, was den
