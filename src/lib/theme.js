@@ -115,6 +115,24 @@ export function btnSecondary(T, size = 'md') {
     ...BTN_SIZES[size],
   };
 }
+// Zurueckgenommener Knopf: nur ein Rand, kein eigener Grund. Fuer die Stellen,
+// an denen mehrere gleichrangige Aktionen nebeneinander stehen und trotzdem nur
+// eine die Hauptaktion sein darf - die "Lernen"-Knoepfe der Kartenboxen neben
+// dem einen gefuellten "Lernen starten". btnSecondary traegt dafuer zu viel
+// Gewicht: eine eigene Flaeche liest sich wie eine zweite Hauptaktion.
+// Der Rand traegt hier T.textMuted statt T.border: T.border sitzt sonst immer vor
+// einer eigenen Flaeche und darf deshalb schwach sein (dunkel 1.17:1). Ohne
+// Flaeche waere der Knopf damit praktisch unsichtbar - T.textMuted erreicht in
+// beiden Designs ueber 3:1 gegen Behaelter und Seitengrund.
+export function btnOutline(T, size = 'md') {
+  return {
+    background: 'transparent', color: T.textSecondary, border: `1px solid ${T.textMuted}`,
+    borderRadius: RADIUS.pill, fontWeight: 600, cursor: 'pointer', display: 'inline-flex',
+    alignItems: 'center', justifyContent: 'center', gap: 8,
+    transition: 'border-color .15s, color .15s, transform .1s',
+    ...BTN_SIZES[size],
+  };
+}
 // Text-/Link-Buttons ohne Fläche - für sekundäre Aktionen wie "Schließen"
 // oder "alle wiederholen", die bisher an jeder Stelle einzeln inline gebaut wurden.
 export function btnGhost(T, size = 'md') {
@@ -152,6 +170,27 @@ export function surface(T, { lift = false } = {}) {
 // eine Karte, dieses ist die Farbe der ruhigen Flaeche.)
 export function surfaceSoft(T) {
   return { background: T.surface, borderRadius: RADIUS.lg };
+}
+
+// Kleine Auszeichnung fuer einen einzelnen Wert - "7 Karten", "4 faellig".
+// Ersetzt die Aufzaehlung mit Mittelpunkten: drei Zahlen in einer Zeile sind drei
+// Angaben, keine Satzkette, und getrennte Flaechen lesen sich schneller als ein
+// durchlaufender Text in gedaempfter Farbe.
+//
+// Zwei Toene, und der Unterschied ist eine Aussage: "aktiv" traegt Gruen und
+// bekommt nur, was heute Handlung verlangt. Wuerde jeder Wert gruen leuchten,
+// saehe alles gleich dringend aus - genau das soll die eine Akzentfarbe verhindern.
+// Beide Kombinationen sind nachgerechnet (hell 4.61:1 / 5.96:1, dunkel 5.57:1 /
+// 5.15:1) und liegen damit ueber 4.5:1.
+export function pill(T, ton = 'neutral') {
+  const aktiv = ton === 'aktiv';
+  return {
+    display: 'inline-flex', alignItems: 'center',
+    padding: `${SPACE.xs}px ${SPACE.sm}px`, borderRadius: RADIUS.pill,
+    background: aktiv ? T.primarySoft : T.surfaceElevated,
+    color: aktiv ? T.primary : T.textSecondary,
+    fontSize: FONT.xs, fontWeight: 500, lineHeight: 1.4, whiteSpace: 'nowrap',
+  };
 }
 
 // Trennlinie zwischen zwei Zeilen einer Liste. Ersetzt die Kaesten um jede einzelne

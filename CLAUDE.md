@@ -36,7 +36,7 @@ The data layer is deliberately separated from the UI so that database work and d
 
 **UI**
 
-- **`src/lib/theme.js`** — the design system: `SPACE`/`RADIUS`/`FONT`/`NAVBAR_H` scales, `THEMES` (light/dark palettes), and the style helpers `btnPrimary`/`btnSecondary`/`btnGhost` (each with `sm`/`md`/`lg` sizes), `ratingBtn`, `surface`. Inline styles throughout; no CSS framework. **All hardcoded spacing/radius/font values have been removed.** Reach for these tokens rather than fresh magic numbers — spacing: `{ xs:4, sm:8, md:12, lg:16, xl:24, xxl:32 }`, radius: `{ sm:6, md:8, lg:12, pill:999 }`, font: `{ xs:11, sm:12, base:13, md:14, lg:16, xl:18, xxl:22, hero:32 }`. This discipline ensures visual consistency across all changes.
+- **`src/lib/theme.js`** — the design system: `SPACE`/`RADIUS`/`FONT`/`NAVBAR_H` scales, `THEMES` (light/dark palettes), and the style helpers `btnPrimary`/`btnSecondary`/`btnOutline`/`btnGhost` (each with `sm`/`md`/`lg` sizes), `pill`, `ratingBtn`, `surface`, `surfaceSoft`, `divider`, plus the `typo*` family. Inline styles throughout; no CSS framework. **All hardcoded spacing/radius/font values have been removed.** Reach for these tokens rather than fresh magic numbers — spacing: `{ xs:4, sm:8, md:12, lg:16, xl:24, xxl:32, xxxl:48 }`, radius: `{ sm:6, md:8, lg:12, pill:999 }`, font: `{ xs:11, sm:12, base:13, md:14, lg:16, xl:18, xxl:22, hero:32 }`. This discipline ensures visual consistency across all changes.
 - **`src/hooks/useVocabStore.js`** — owns `cards`, activity, `flipped`, `newCardsPerDay`, persistence. Exposes **only intent-based actions** (`addCards`, `rateCard`, `deleteCard`, `importData`), never a raw `setCards` — that is what guarantees every mutation stamps `updatedAt`.
 - **`src/App.jsx`** — all UI. Views are toggled by a single `view` state: `dashboard` / `add` / `browse` / `account` render as conditional blocks inside the main return, but **`study` returns early as its own full-screen layer** (before the header and bottom nav) so the learning session has no surrounding chrome. Two top-level `return`s, not one.
 - **`src/ui/AuthScreen.jsx`**, **`src/ui/SyncBadge.jsx`** — the only extracted components.
@@ -61,6 +61,11 @@ The data layer is deliberately separated from the UI so that database work and d
 ### Design aesthetic: Anki-style
 
 The app's visual design targets a professional, utilitarian look (inspired by Anki) rather than decorative/playful. Changes prioritize clarity and efficiency: smaller radius, flatter shadows, tighter spacing, smaller font scale. This is enforced through the design token system — no hardcoding. When styling a new component, use `SPACE`/`RADIUS`/`FONT`/`THEMES` tokens exclusively. If a value doesn't fit the scales, it means the component needs rethinking, not a new magic number.
+
+Two rules the color system rests on, both enforced by hand — nothing checks them at build time:
+
+- **One filled green button per screen.** `btnPrimary` marks the single main action; every competing action uses `btnOutline` (or `btnGhost`). Two filled buttons side by side read as two main actions and the screen loses its center of gravity.
+- **Green means "act now", not "this is a number".** `primary` carries the main action, the active state, progress and the key figures; `success`/`warning`/`error` are reserved for immediate feedback (rating buttons, toasts) and must not be borrowed as a second accent — `success` and `primary` are nearly the same green and reading two of them on one screen is what "leicht variierende Grüntöne" means. Categories are distinguished by the *shape* of their icon, never by a color of their own: that is why the Fehlerkartei's warning triangle is green like every other deck icon.
 
 ### UI gotchas
 
