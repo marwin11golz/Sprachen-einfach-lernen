@@ -12,7 +12,6 @@ import {
   newVocabCard, newGapCard, rescheduleCard,
   VOCAB_PAIRS, SENTENCE_LANGS, langCodeOf,
 } from './lib/srs.js';
-import { EARLY_STEPS } from './lib/fsrs.js';
 import {
   THEMES, hexToRgba, SPACE, RADIUS, FONT, NAVBAR_H,
   btnPrimary, btnSecondary, btnGhost, btnOutline, pill, ratingBtn, surface, surfaceSoft, divider,
@@ -32,18 +31,25 @@ const DECK_FEHLER = '__fehlerkartei';
 // Wiederholungsdichte als benannte Stufen statt als nackte Prozentzahl: Der
 // Wert IST die Zielretention aus fsrs.js, aber "wie sicher soll eine Vokabel
 // beim Wiedersehen noch sitzen" ist nichts, was man im Vorbeigehen in Prozent
-// entscheidet. Die Beispiele nennen die Intervallreihe fuer "Gut" - daran
-// laesst sich die Wahl tatsaechlich festmachen.
-// Die Zielretention greift erst NACH der festen Anfangsphase - deren sieben
-// Abstaende stehen in EARLY_STEPS und haengen an keinem Regler. Die Reihen hier
-// sind deshalb die, mit denen FSRS danach weiterrechnet, nicht die von Anfang
-// an. Alles andere waere ein Versprechen, das die Leiter ueberstimmt.
+// entscheidet.
+//
+// Die Stufennamen bilden eine Skala von dicht nach locker und tragen die
+// Bedeutung allein - Zahlen stehen bewusst nirgends in der Oberflaeche. Die
+// Terminierung ist Hintergrundarbeit; wer beim Bewerten liest, dass eine Karte
+// erst in 272 Tagen wiederkommt, bewertet ab da die Zahl statt sein Wissen.
+// Zur Einordnung, welche Stufe was bedeutet - die Reihe, die eine mit "Gut"
+// bestaetigte Karte NACH der festen Anfangsphase (EARLY_STEPS) durchlaeuft:
+//   0.97  150 · 221 · 320 Tage
+//   0.95  272 · 488 · 841 Tage
+//   0.92  493 · 1130 · 2400 Tage
+//   0.90  674 · 1770 · 4222 Tage
+//   0.85  1286 · 4485 · 13553 Tage
 const DICHTE_STUFEN = [
-  { wert: 0.97, name: 'Sehr dicht', reihe: '150 · 221 · 320 Tage' },
-  { wert: 0.95, name: 'Gründlich', reihe: '272 · 488 · 841 Tage' },
-  { wert: 0.92, name: 'Ausgewogen', reihe: '493 · 1130 · 2400 Tage' },
-  { wert: 0.90, name: 'Locker', reihe: '674 · 1770 · 4222 Tage' },
-  { wert: 0.85, name: 'Sehr locker', reihe: '1286 · 4485 · 13553 Tage' },
+  { wert: 0.97, name: 'Sehr dicht' },
+  { wert: 0.95, name: 'Gründlich' },
+  { wert: 0.92, name: 'Ausgewogen' },
+  { wert: 0.90, name: 'Locker' },
+  { wert: 0.85, name: 'Sehr locker' },
 ];
 
 // Eine Stapelzeile: Name, Kartenzahl, Lernstand, Hauptaktion - in dieser
@@ -1065,13 +1071,6 @@ export default function VokabelTrainer() {
                       ))}
                     </select>
                   </label>
-                  {/* Die Stufe allein sagt nichts - erst die Intervallreihe macht
-                      greifbar, wann eine mit "Gut" bestaetigte Karte wiederkommt.
-                      Beide Teile stehen da, weil der Regler nur den zweiten
-                      betrifft. */}
-                  <div style={{ ...typoCaption(), color: T.textMuted, flexBasis: '100%', textAlign: 'right' }}>
-                    „Gut“ fest auf {EARLY_STEPS.good.join(' · ')} Tage, danach {aktiveDichte.reihe}
-                  </div>
                 </div>
               </div>
 
