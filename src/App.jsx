@@ -12,6 +12,7 @@ import {
   newVocabCard, newGapCard,
   VOCAB_PAIRS, SENTENCE_LANGS, langCodeOf,
 } from './lib/srs.js';
+import { RETENTION } from './lib/fsrs.js';
 import {
   THEMES, hexToRgba, SPACE, RADIUS, FONT, NAVBAR_H,
   btnPrimary, btnSecondary, btnGhost, btnOutline, pill, ratingBtn, surface, surfaceSoft, divider,
@@ -415,7 +416,12 @@ export default function VokabelTrainer() {
     const updated = rateCard(current.id, ratingKey);
     if (!updated) { setCurrent(null); return; }
     let rest = queue.slice(1);
-    if (ratingKey === 'again') {
+    // Zurueck in die Warteschlange kommt, was heute noch einmal drankommen
+    // soll: eine vergessene Karte, und der Zehn-Minuten-Schritt der festen
+    // Anfangsphase (Intervall 0). Ein Datum kann keine zehn Minuten
+    // ausdruecken - dass die Karte in derselben Sitzung wiederkehrt, ist die
+    // Entsprechung dazu.
+    if (ratingKey === 'again' || updated.interval === 0) {
       const pos = Math.min(rest.length, 3);
       rest = [...rest.slice(0, pos), updated, ...rest.slice(pos)];
     }
@@ -497,7 +503,10 @@ export default function VokabelTrainer() {
 
   const exportJSON = () => {
     // Grabsteine kommen bewusst mit, damit ein Import auch Loeschungen uebernimmt.
-    setExportText(JSON.stringify({ schemaVersion: 2, cards: allCards, activityLog: activity, flipped }, null, 2));
+    // retention faehrt als fester Wert mit: die Spanischcoach-Skill liest sie
+    // aus der JSON, und so bleibt die Datei auch dann eindeutig, wenn sie in
+    // einem Stand landet, der die Zielretention noch fuer einstellbar haelt.
+    setExportText(JSON.stringify({ schemaVersion: 2, cards: allCards, activityLog: activity, flipped, retention: RETENTION }, null, 2));
   };
 
   const copyExportText = async () => {
@@ -999,14 +1008,16 @@ export default function VokabelTrainer() {
             <div style={{ marginBottom: SPACE.xxxl }}>
               <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: SPACE.md, gap: SPACE.sm }}>
                 <div style={{ ...typoH2() }}>Kartenboxen</div>
-                <label style={{ display: 'flex', alignItems: 'center', gap: SPACE.sm, fontSize: FONT.sm, color: T.textSecondary }}>
-                  Neu/Tag:
-                  <input
-                    type="number" min={0} value={newCardsPerDay}
-                    onChange={e => setNewCardsPerDay(Math.max(0, Number(e.target.value) || 0))}
-                    style={{ width: 52, padding: `${SPACE.xs}px ${SPACE.sm}px`, borderRadius: RADIUS.sm, border: `1px solid ${T.border}`, background: T.surfaceElevated, color: T.textPrimary, fontSize: FONT.sm, textAlign: 'center' }}
-                  />
-                </label>
+                <div style={{ display: 'flex', alignItems: 'center', gap: SPACE.lg, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: SPACE.sm, fontSize: FONT.sm, color: T.textSecondary }}>
+                    Neu/Tag:
+                    <input
+                      type="number" min={0} value={newCardsPerDay}
+                      onChange={e => setNewCardsPerDay(Math.max(0, Number(e.target.value) || 0))}
+                      style={{ width: 52, padding: `${SPACE.xs}px ${SPACE.sm}px`, borderRadius: RADIUS.sm, border: `1px solid ${T.border}`, background: T.surfaceElevated, color: T.textPrimary, fontSize: FONT.sm, textAlign: 'center' }}
+                    />
+                  </label>
+                </div>
               </div>
 
               {/* Ein Behaelter mit eigenem Grund: auf dem fast schwarzen Seitengrund

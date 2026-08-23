@@ -6,7 +6,7 @@
 // an einer einzigen Stelle, gewinnt beim Abgleich später der falsche Stand.
 
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { rate, todayISO } from '../lib/srs.js';
+import { rate, todayISO, rescheduleCard } from '../lib/srs.js';
 import { loadLocal, saveLocal, migrateCard } from '../lib/storage.js';
 import { mergeCards, combinedActivity, purgeOldTombstones } from '../lib/merge.js';
 
@@ -32,7 +32,22 @@ export function useVocabStore() {
   // --- Laden ---
   useEffect(() => {
     const { state, warning } = loadLocal();
-    setAllCards(purgeOldTombstones(state.cards));
+    let start = purgeOldTombstones(state.cards);
+    // Einmalige Umstellung auf die feste Zielretention. Betrifft zwei Gruppen:
+    // wer die App vor der Zielretention benutzt hat, und wer spaeter am
+    // Dichte-Regler gedreht hatte. Beide tragen Karten, die mit einer flacheren
+    // Kurve weit in der Zukunft liegen - ohne Umrechnung wuerden die von der
+    // festen 0,95 nie wieder erfasst und blieben monatelang unsichtbar.
+    //
+    // Bewusst OHNE updatedAt-Stempel - genau wie bei der Schema-Migration in
+    // storage.js. Die Rechnung ist deterministisch, also kommt jedes Geraet
+    // fuer sich auf dasselbe Ergebnis; wuerde stattdessen gestempelt, koennte
+    // das zuerst geoeffnete Geraet ungesyncte Bewertungen des anderen
+    // ueberschreiben.
+    if (state.needsRetentionReset) {
+      start = start.map(c => (c.deleted ? c : rescheduleCard(c)));
+    }
+    setAllCards(start);
     setActivityLocal(state.activityLocal);
     setActivityRemote(state.activityRemote);
     setFlipped(state.flipped);

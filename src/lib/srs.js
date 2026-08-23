@@ -10,10 +10,29 @@ import {
   RATING, initialStability, initialDifficulty, nextDifficulty,
   retrievability, nextStabilityRecall, nextStabilityForget, shortTermStability,
   nextInterval, STABILITY_MIN,
+  earlyInterval, EARLY_COUNT,
 } from './fsrs.js';
 
 export const todayISO = () => new Date().toISOString().slice(0, 10);
 export const uid = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
+
+// Abstand zweier Lerntage in KALENDERTAGEN.
+//
+// Vorher wurde dafuer die Differenz zwischen der aktuellen UHRZEIT und
+// Mitternacht des letzten Lerntags gerundet. Das zaehlte systematisch falsch:
+// wer nachmittags lernte, lag ueber der halben Tagesgrenze und bekam bei
+// JEDER Wiederholung einen Tag zu viel angerechnet (zwei Kalendertage Abstand
+// wurden zu "elapsed = 3"). Das Modell hielt die Erinnerung dann fuer
+// belastbarer als sie war, liess die Stabilitaet zu stark wachsen und schob
+// die Karte immer weiter weg - genau die Beschwerde, dass gut gekonnte
+// Vokabeln nie wiederkommen. Beide Daten sind reine Tagesstempel, also
+// gehoert auch die Differenz auf Tagesebene gebildet.
+export function daysBetween(fromISO, toISO) {
+  const from = new Date(`${fromISO}T00:00:00.000Z`);
+  const to = new Date(`${toISO}T00:00:00.000Z`);
+  if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime())) return 0;
+  return Math.max(0, Math.round((to - from) / 86400000));
+}
 
 // Einmaliges Impfen von stability/difficulty für Karten aus der Zeit vor
 // FSRS: Das zuletzt gewählte Intervall IST bereits eine Schätzung, wie
@@ -30,6 +49,28 @@ function seedFromLegacy(card) {
 }
 
 // ---------- FSRS-Kern ----------
+//
+// Was in das naechste Faelligkeitsdatum eingeht - alles davon steckt in den
+// wenigen Zeilen unten, auch wenn man es ihnen nicht ansieht:
+//
+//   Stabilitaet          c.stability, fortgeschrieben bei jeder Bewertung
+//   Schwierigkeit        c.difficulty, ueber nextDifficulty()
+//   Abrufwahrscheinlichk. retrievability(elapsed, S) - wie sicher die Karte
+//                        JETZT noch sass, bevor sie aufgedeckt wurde
+//   Zeit seit zuletzt    elapsed, in Kalendertagen (daysBetween)
+//   diese Bewertung      r, plus hardPenalty/easyBonus in nextStabilityRecall
+//   Vergessensereignisse jedes "Nochmal" laeuft durch nextStabilityForget und
+//                        hebt zugleich die Schwierigkeit - beides bleibt an der
+//                        Karte stehen und wirkt bei jeder spaeteren Rechnung mit
+//   fruehere Bewertungen kumuliert in genau diesen beiden Werten
+//   fruehere Intervalle  ebenso - die Stabilitaet IST die Schaetzung, wie viele
+//                        Tage die Erinnerung traegt
+//   Zielretention        fest 0,95 (RETENTION in fsrs.js), in nextInterval()
+//
+// FSRS fuehrt bewusst keinen eigenen Zaehler fuer Wiederholungen oder Lapses in
+// der Formel: Stabilitaet und Schwierigkeit SIND das Gedaechtnis der ganzen
+// Historie. Zwei Karten mit gleicher Bewertungsgeschichte landen deshalb beim
+// selben Datum, egal auf welchem Weg sie dorthin kamen.
 export function rate(card, rating) {
   const c = { ...card };
   const r = RATING[rating];
@@ -47,9 +88,7 @@ export function rate(card, rating) {
     c.stability = initialStability(r);
     c.difficulty = initialDifficulty(r);
   } else {
-    const elapsed = c.lastReviewed
-      ? Math.max(0, Math.round((today - new Date(`${c.lastReviewed}T00:00:00.000Z`)) / 86400000))
-      : 0;
+    const elapsed = c.lastReviewed ? daysBetween(c.lastReviewed, iso(today)) : 0;
     const difficulty = nextDifficulty(c.difficulty, r);
     let stability;
     if (elapsed === 0) {
@@ -64,7 +103,23 @@ export function rate(card, rating) {
     c.difficulty = difficulty;
   }
 
-  c.interval = nextInterval(c.stability);
+  // Anfangsphase: die ersten sieben Wiederholungen laufen auf festen
+  // Abstaenden, FSRS rechnet daneben trotzdem weiter. Das ist Absicht - die
+  // Stabilitaet wird aus den TATSAECHLICH verstrichenen Tagen fortgeschrieben,
+  // das Modell bleibt also stimmig, und nach der Leiter kann es nahtlos
+  // uebernehmen. Nur die Wahl des Faelligkeitsdatums ist hier uebersteuert.
+  //
+  // Die Stufe zaehlt an der Karte mit, statt aus totalReviews abgeleitet zu
+  // werden: nur so kann "Nochmal" sie zuruecksetzen.
+  const stufe = Number.isFinite(c.earlyStep) ? c.earlyStep : (c.totalReviews || 0);
+  const fest = earlyInterval(stufe, rating);
+
+  c.interval = fest != null ? fest : nextInterval(c.stability);
+  // Vergessen wirft auf den Anfang der Leiter zurueck, jede erinnerte
+  // Bewertung rueckt eine Stufe weiter. Ist die Leiter durch, bleibt der
+  // Zaehler stehen und FSRS terminiert von hier an allein.
+  c.earlyStep = rating === 'again' ? 0 : Math.min(EARLY_COUNT, stufe + 1);
+
   const due = new Date(today);
   due.setDate(due.getDate() + c.interval);
   c.dueDate = iso(due);
@@ -80,6 +135,44 @@ export function rate(card, rating) {
   c.ease = Math.round((1.3 + ((10 - c.difficulty) / 9) * 1.7) * 100) / 100;
 
   c.lastReviewed = iso(today);
+  return c;
+}
+
+// Terminiert eine bereits gelernte Karte auf die feste Zielretention um.
+//
+// Gebraucht wird das nur noch als einmalige Umstellung beim Laden (siehe
+// useVocabStore): Karten aus der Zeit des Dichte-Reglers liegen mit einer
+// flacheren Kurve 163 oder 674 Tage in der Zukunft und wuerden von der festen
+// 0,95 sonst nie wieder erfasst. Umgerechnet wird ausschliesslich das
+// Faelligkeitsdatum, und zwar aus der gespeicherten Stabilitaet - der
+// Lernfortschritt selbst (Stabilitaet, Schwierigkeit, Zaehler, Trefferquote)
+// bleibt unangetastet.
+//
+// Anders als sonst duerfen Karten hier bewusst springen: dass sie springen,
+// IST der Zweck. Deshalb werden Altkarten aus der Zeit vor FSRS hier auch
+// sofort geimpft statt wie ueblich erst bei ihrer naechsten Bewertung -
+// seedFromLegacy() liest das alte interval als Stabilitaetsschaetzung, und die
+// wuerde durch das neu gerechnete interval sonst verfaelscht.
+export function rescheduleCard(card) {
+  // Noch nie bewertete Karten haben keine Stabilitaet, die sich umrechnen
+  // liesse - sie sind ohnehin sofort faellig.
+  if (!card.lastReviewed || !(card.totalReviews > 0)) return card;
+  // Karten in der festen Anfangsphase haengen nicht an der Zielretention -
+  // ihr Abstand steht in EARLY_STEPS. Sie umzurechnen wuerde die Leiter
+  // ueberspringen und die Karte mitten in der Einarbeitung weit wegschieben.
+  const stufe = Number.isFinite(card.earlyStep) ? card.earlyStep : (card.totalReviews || 0);
+  if (stufe < EARLY_COUNT) return card;
+
+  const c = { ...card };
+  if (c.stability == null) {
+    const seeded = seedFromLegacy(c);
+    c.stability = seeded.stability;
+    c.difficulty = seeded.difficulty;
+  }
+  c.interval = nextInterval(c.stability);
+  const due = new Date(`${c.lastReviewed}T00:00:00.000Z`);
+  due.setUTCDate(due.getUTCDate() + c.interval);
+  c.dueDate = due.toISOString().slice(0, 10);
   return c;
 }
 
@@ -169,6 +262,9 @@ function baseCard() {
     id: uid(),
     ease: 2.5, interval: 0, repetitions: 0, dueDate: todayISO(),
     stability: null, difficulty: null,
+    // Stufe auf der festen Anfangsleiter (EARLY_STEPS). Bestandskarten ohne
+    // dieses Feld leiten ihre Stufe aus totalReviews ab - siehe rate().
+    earlyStep: 0,
     createdAt: todayISO(), lastReviewed: null, totalReviews: 0, correct: 0, wrong: 0,
   };
 }

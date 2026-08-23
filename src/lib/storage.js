@@ -8,12 +8,16 @@
 //     activityLocal: {...},    // Lerntage DIESES Geräts
 //     activityRemote: {...},   // Summe aller anderen Geräte (kommt aus der Cloud)
 //     flipped: false,
+//     newCardsPerDay: 20,      // nur lokal, nicht Teil des Cloud-Abgleichs
+//     retention: 0.95,         // Marke, auf welche Zielretention der Bestand
+//                              // gerechnet ist - nicht mehr einstellbar
 //     deviceId: "...",
 //     lastUserId: null,
 //     lastSyncAt: null
 //   }
 
 import { uid } from './srs.js';
+import { RETENTION } from './fsrs.js';
 
 export const STORAGE_KEY = 'lucy-lernt-sprachen-vocab-data';
 export const DEVICE_KEY = 'lucy-lernt-sprachen-device-id';
@@ -116,6 +120,14 @@ export function loadLocal() {
     // Cloud-Prefs-Abgleichs (siehe useVocabStore.js): eine Lerntempo-
     // Praeferenz, kein Lernfortschritt.
     newCardsPerDay: Number.isFinite(parsed.newCardsPerDay) ? parsed.newCardsPerDay : 20,
+    // Die Zielretention ist fest (RETENTION in fsrs.js) und nicht mehr
+    // einstellbar. Der gespeicherte Wert ist nur noch die Marke, auf welche
+    // Retention der Kartenbestand gerechnet ist: steht dort etwas anderes -
+    // ein alter Reglerwert, oder gar nichts, weil der Stand aelter ist als die
+    // Zielretention selbst - dann liegen die Faelligkeiten auf einer anderen
+    // Kurve und der Store rechnet sie beim Laden einmalig um. Danach steht hier
+    // 0,95 und die Umstellung laeuft nie wieder.
+    needsRetentionReset: parsed.retention !== RETENTION,
     prefsUpdatedAt: parsed.prefsUpdatedAt || null,
     lastUserId: parsed.lastUserId || null,
     lastSyncAt: parsed.lastSyncAt || null,
@@ -133,6 +145,9 @@ export function saveLocal(state) {
       activityRemote: state.activityRemote,
       flipped: state.flipped,
       newCardsPerDay: state.newCardsPerDay ?? 20,
+      // Immer der feste Wert: die Marke sagt, auf welche Zielretention der
+      // Bestand gerechnet ist, und ab hier ist das immer 0,95.
+      retention: RETENTION,
       prefsUpdatedAt: state.prefsUpdatedAt ?? null,
       lastUserId: state.lastUserId ?? null,
       lastSyncAt: state.lastSyncAt ?? null,

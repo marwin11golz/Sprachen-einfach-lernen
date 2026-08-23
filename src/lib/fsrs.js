@@ -20,10 +20,63 @@ export const W = [
 const DECAY = -W[20];
 const FACTOR = Math.pow(0.9, 1 / DECAY) - 1;
 export const STABILITY_MIN = 0.001;
-const DESIRED_RETENTION = 0.9;
 const MAX_INTERVAL = 36500;
 
+// Zielretention: Wie sicher eine Karte beim Wiedersehen noch sitzen soll.
+// FEST auf 0,95 - kein Regler, keine Einstellung.
+//
+// Der Wert liegt bewusst ueber dem Anki-Standard von 0,9. Bei 0,9 waechst eine
+// mit "Gut" bestaetigte Karte auf 2 → 11 → 46 → 163 Tage; wer ein paar Tage
+// aussetzt, sieht danach nur noch die Karten wieder, die er oft falsch hatte,
+// waehrend alles Gekonnte monatelang unsichtbar bleibt. Das ist zwar
+// algorithmisch korrekt (FSRS rechnet fuer grosse Sammlungen auf Effizienz),
+// fuehlt sich bei einer kleinen, jungen Kartei aber wie das Gegenteil von
+// Festigen an.
+//
+// Warum ein fester Wert und kein Regler: Die Zielretention ist die einzige
+// Groesse im Modell, die NICHT aus dem Lernverhalten stammt - alles andere
+// (Stabilitaet, Schwierigkeit, Abrufwahrscheinlichkeit) rechnet FSRS aus den
+// tatsaechlichen Bewertungen. Ein Regler daneben laedt dazu ein, an der
+// Terminierung zu drehen, statt die Bewertungen sprechen zu lassen; die
+// Verlaengerung, die man sich davon verspricht, entsteht ohnehin von selbst,
+// sobald eine Karte wirklich sitzt.
+export const RETENTION = 0.95;
+
 export const RATING = { again: 1, hard: 2, good: 3, easy: 4 };
+
+// ---------- Feste Anfangsphase ----------
+// Die ersten sieben Wiederholungen einer Karte laufen auf festen Abstaenden,
+// erst danach rechnet FSRS die Intervalle selbst weiter.
+//
+// Grund: die Referenzgewichte sind auf grosse Anki-Sammlungen angepasst, in
+// denen "Einfach" sparsam benutzt wird. Fuer eine kleine, junge Kartei ist der
+// Zuwachs dort zu steil - eine Vokabel, die erst zweimal als "Einfach"
+// bewertet wurde, laege sonst schon 52 Tage in der Zukunft und danach bei 167.
+//
+// Die Stufe 0 fuer "Schwer" ist der Zehn-Minuten-Schritt: an Tagesabstaenden
+// gemessen bleibt die Karte heute faellig und kommt in derselben Sitzung
+// wieder (siehe submitRating in App.jsx). Eine Uhrzeit gibt es hier bewusst
+// nicht - dueDate ist ein Datum.
+//
+// "Nochmal" steht absichtlich nicht in der Tabelle: eine vergessene Karte
+// bekommt weiter das Intervall, das FSRS aus ihrer eigenen Stabilitaet
+// errechnet. Sie faellt dafuer auf Stufe 1 zurueck (siehe rate()), sonst
+// bekaeme eine gerade vergessene Karte beim naechsten "Gut" die 70 Tage der
+// Stufe 6.
+export const EARLY_STEPS = {
+  hard: [0, 1, 2, 4, 7, 12, 20],
+  good: [1, 3, 7, 16, 35, 70, 140],
+  easy: [3, 7, 18, 40, 80, 160, 320],
+};
+export const EARLY_COUNT = EARLY_STEPS.good.length;
+
+// Das feste Intervall fuer diese Stufe, oder null, wenn die Anfangsphase
+// vorbei ist oder die Bewertung keine Leiter hat ("Nochmal").
+export function earlyInterval(step, rating) {
+  const reihe = EARLY_STEPS[rating];
+  if (!reihe || !(step >= 0) || step >= reihe.length) return null;
+  return reihe[step];
+}
 
 const clampDifficulty = (d) => Math.min(10, Math.max(1, d));
 
@@ -78,10 +131,9 @@ export function shortTermStability(S, r) {
   return Math.max(S * inc, STABILITY_MIN);
 }
 
-// Bei Zielretention 0,9 vereinfacht sich das rechnerisch zu round(S) - die
-// allgemeine Formel bleibt trotzdem stehen, falls die Zielretention später
-// einstellbar werden soll.
+// Der Abstand, nach dem die Abrufwahrscheinlichkeit auf RETENTION gefallen ist.
+// Bei 0,9 ergaebe das rechnerisch genau round(S); bei 0,95 entsprechend weniger.
 export function nextInterval(S) {
-  const raw = (S / FACTOR) * (Math.pow(DESIRED_RETENTION, 1 / DECAY) - 1);
+  const raw = (S / FACTOR) * (Math.pow(RETENTION, 1 / DECAY) - 1);
   return Math.min(MAX_INTERVAL, Math.max(1, Math.round(raw)));
 }
