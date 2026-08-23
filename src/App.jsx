@@ -14,7 +14,7 @@ import {
 } from './lib/srs.js';
 import {
   THEMES, hexToRgba, SPACE, RADIUS, FONT, NAVBAR_H,
-  btnPrimary, btnSecondary, btnGhost, ratingBtn, surface, surfaceSoft, divider,
+  btnPrimary, btnSecondary, btnGhost, btnOutline, pill, ratingBtn, surface, surfaceSoft, divider,
   typoDisplay, typoH1, typoH2, typoBody, typoSecondary, typoCaption, typoNumber,
 } from './lib/theme.js';
 import { useVocabStore } from './hooks/useVocabStore.js';
@@ -32,35 +32,108 @@ const DECK_FEHLER = '__fehlerkartei';
 // Rangfolge. Kartenboxen und Fehlerkartei teilen sie sich, damit die
 // Fehlerkartei sich wie ein Stapel anfuehlt und nicht wie ein Sonderfall.
 function DeckZeile({ T, icon, name, anzahl, neu, faellig, onLernen, lernbar, trenner }) {
-  const stand = [
-    neu > 0 ? `${neu} neu` : null,
-    faellig > 0 ? `${faellig} fällig` : null,
-  ].filter(Boolean).join(' · ');
+  // Jeder Wert steht fuer sich. Ist nichts faellig, sagt die Zeile das auch -
+  // vorher verschwand die Angabe wortlos und die Zeile wirkte unvollstaendig.
+  const werte = [
+    { text: `${anzahl} ${anzahl === 1 ? 'Karte' : 'Karten'}`, ton: 'neutral' },
+    ...(neu > 0 ? [{ text: `${neu} neu`, ton: 'neutral' }] : []),
+    faellig > 0
+      ? { text: `${faellig} fällig`, ton: 'aktiv' }
+      : { text: 'heute nichts fällig', ton: 'neutral' },
+  ];
   return (
     <div className="row-link" style={{
       display: 'flex', alignItems: 'center', gap: SPACE.md,
-      padding: `${SPACE.lg}px ${SPACE.md}px`, borderRadius: RADIUS.md,
+      padding: `${SPACE.lg}px ${SPACE.md}px`,
       ...(trenner ? divider(T) : null),
     }}>
-      <div style={{
-        width: 38, height: 38, borderRadius: RADIUS.md, background: T.surfaceElevated,
-        display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-      }}>
-        {icon}
-      </div>
+      {/* Ohne Kachel dahinter und in einer Farbe: das Symbol unterscheidet die
+          Kategorie ueber seine Form, nicht ueber einen eigenen Farbton. */}
+      <div style={{ display: 'flex', alignItems: 'center', flexShrink: 0 }}>{icon}</div>
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ ...typoSecondary('lg'), overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+        <div style={{ ...typoBody('lg'), overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
           {name}
         </div>
-        <div style={{ ...typoCaption(), color: T.textMuted, marginTop: 2 }}>
-          {anzahl} {anzahl === 1 ? 'Karte' : 'Karten'}
-          {stand && <span style={{ color: T.textSecondary }}> · {stand}</span>}
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: SPACE.xs, marginTop: SPACE.sm }}>
+          {werte.map(w => <span key={w.text} style={pill(T, w.ton)}>{w.text}</span>)}
         </div>
       </div>
       <button className="press" onClick={onLernen} disabled={!lernbar}
-        style={{ ...btnSecondary(T, 'sm'), flexShrink: 0, opacity: lernbar ? 1 : .4 }}>
+        style={{ ...btnOutline(T, 'sm'), flexShrink: 0, opacity: lernbar ? 1 : .4 }}>
         Lernen <ChevronRight size={14} />
       </button>
+    </div>
+  );
+}
+
+// Wiederholungen je Woche als Balken, darueber der gleitende Schnitt ueber drei
+// Wochen. Von Hand gezeichnet wie der Ring darunter - ein Diagrammpaket kostet
+// rund 100 kB gzip und braechte eine zweite Styling-Ebene neben die Design-Tokens.
+//
+// Balken sind HTML, nur die Trendlinie ist SVG: eine Flaeche, die in der Breite
+// mitwaechst, verzieht als SVG-Rechteck ihre Ecken, als div nicht. Die Linie
+// darf sich verziehen, solange die Strichstaerke es nicht tut - dafuer
+// vectorEffect.
+function WochenDiagramm({ T, wochen }) {
+  const max = Math.max(1, ...wochen.map(w => w.count));
+  const spitze = wochen.reduce((a, b) => (b.count > a.count ? b : a), wochen[0]);
+  const schnitt = wochen.map((_, i) => {
+    const teil = wochen.slice(Math.max(0, i - 2), i + 1);
+    return teil.reduce((s, w) => s + w.count, 0) / teil.length;
+  });
+  const punkte = schnitt
+    .map((v, i) => `${(i + 0.5) * (100 / wochen.length)},${100 - (v / max) * 100}`)
+    .join(' ');
+  const HOEHE = 96;
+  // Platz ueber den Balken fuer die Beschriftung des Hoechstwerts. Die Balken
+  // muessen darunter bleiben, sonst schiebt die Zahl den hoechsten Balken heraus.
+  const KOPF = 16;
+  return (
+    <div>
+      {/* Die Grundlinie liegt am Behaelter, nicht an den Balken: so hat das
+          Diagramm auch dann eine Achse, wenn keine einzige Woche einen Balken
+          traegt - eine ruhige Woche sieht sonst aus wie fehlende Daten. */}
+      <div style={{ position: 'relative', height: HOEHE, borderBottom: `1px solid ${T.hairline}` }}>
+        {/* Die 2 px Luft zwischen den Balken sind keine Layout-Abstufung, sondern
+            Diagramm-Geometrie: benachbarte Flaechen trennt der Spalt, kein Rand. */}
+        <div style={{ display: 'flex', alignItems: 'flex-end', gap: 2, height: '100%', paddingTop: KOPF, boxSizing: 'border-box' }}>
+          {wochen.map(w => (
+            // Der Streifen nimmt die volle Spaltenbreite (Trefferflaeche und
+            // gleicher Raster wie die Trendlinie), der Balken darin ist auf 24 px
+            // gedeckelt und mittig. Die Deckelung am Streifen selbst haette die
+            // Balken links zusammengeschoben - sie staenden dann nicht mehr unter
+            // ihrem Punkt auf der Linie.
+            <div key={w.ab} title={`Woche ab ${w.ab}: ${w.count} Wiederholungen`}
+              style={{ flex: 1, height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', alignItems: 'center' }}>
+              {w === spitze && w.count > 0 && (
+                <div className="mono" style={{ fontSize: FONT.xs, color: T.textMuted, lineHeight: 1, marginBottom: SPACE.xs }}>{w.count}</div>
+              )}
+              <div style={{
+                width: '100%', maxWidth: 24,
+                height: w.count === 0 ? 0 : `${Math.max(4, (w.count / max) * 100)}%`,
+                background: T.primary,
+                borderRadius: `${RADIUS.sm}px ${RADIUS.sm}px 0 0`,
+                transition: 'height .3s ease',
+              }} />
+            </div>
+          ))}
+        </div>
+        {/* Oben um KOPF eingerueckt, damit Linie und Balken denselben Massstab
+            haben. preserveAspectRatio="none" verzerrt die Flaeche - die
+            Strichstaerke haelt vectorEffect davon fern.
+            Hoehe und Breite muessen ausgeschrieben stehen: mit top/bottom allein
+            nimmt das SVG seine eigene Groesse an (ein quadratisches viewBox wurde
+            640 px hoch statt 80) und die Linie landet weit unter dem Diagramm. */}
+        <svg viewBox="0 0 100 100" preserveAspectRatio="none"
+          style={{ position: 'absolute', top: KOPF, left: 0, width: '100%', height: HOEHE - KOPF, pointerEvents: 'none' }}>
+          <polyline points={punkte} fill="none" stroke={T.textSecondary} strokeWidth={2}
+            strokeLinejoin="round" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
+        </svg>
+      </div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: SPACE.sm, fontSize: FONT.xs, color: T.textMuted }}>
+        <span>{wochen[0].ab}</span>
+        <span>{wochen[wochen.length - 1].ab}</span>
+      </div>
     </div>
   );
 }
@@ -218,7 +291,6 @@ export default function VokabelTrainer() {
 
   // --- Stats ---
   const dueCards = useMemo(() => cards.filter(c => c.dueDate <= todayISO()), [cards]);
-  const newCardsCount = useMemo(() => dueCards.filter(c => c.repetitions === 0).length, [dueCards]);
   // Neue Karten, die HEUTE schon zum ersten Mal bewertet wurden - aus den
   // Karten abgeleitet statt in einem eigenen Zaehler mitgefuehrt, damit
   // mehrere Sitzungen am selben Tag und ein Cloud-Abgleich dazwischen den
@@ -227,7 +299,6 @@ export default function VokabelTrainer() {
     () => cards.filter(c => c.totalReviews === 1 && c.lastReviewed === todayISO()).length,
     [cards],
   );
-  const reviewCount = dueCards.length - newCardsCount;
   const learnedCount = cards.filter(c => c.repetitions > 0).length;
   const totalReviewsAll = cards.reduce((s, c) => s + (c.totalReviews || 0), 0);
   const totalCorrect = cards.reduce((s, c) => s + (c.correct || 0), 0);
@@ -251,19 +322,25 @@ export default function VokabelTrainer() {
   const dayGoal = reviewsToday + dueCards.length;
   const dayPercent = dayGoal > 0 ? (reviewsToday / dayGoal) * 100 : 0;
 
-  // GitHub-artige Stempel-Heatmap: 12 Wochen x 7 Tage
-  const heatmap = useMemo(() => {
-    const days = [];
+  // Wiederholungen der letzten 12 Wochen, je Woche zusammengezaehlt. Vorher lag
+  // hier eine Stempel-Heatmap ueber 84 einzelne Tage; bei einer Handvoll
+  // Wiederholungen im Quartal standen dort 80 leere Kaestchen. Die Wochensumme
+  // zeigt dieselbe Aktivitaet als Verlauf, ohne die Leere zu betonen.
+  const wochen = useMemo(() => {
+    const tage = [];
     for (let i = 83; i >= 0; i--) {
       const d = new Date(); d.setDate(d.getDate() - i);
       const iso = d.toISOString().slice(0, 10);
-      days.push({ date: iso, count: activity[iso] || 0 });
+      tage.push({ date: iso, count: activity[iso] || 0 });
     }
-    const weeks = [];
-    for (let i = 0; i < days.length; i += 7) weeks.push(days.slice(i, i + 7));
-    const max = Math.max(1, ...days.map(d => d.count));
-    return { weeks, max };
+    const out = [];
+    for (let i = 0; i < tage.length; i += 7) {
+      const block = tage.slice(i, i + 7);
+      out.push({ ab: block[0].date.slice(5), count: block.reduce((s, t) => s + t.count, 0) });
+    }
+    return out;
   }, [activity]);
+  const wochenSumme = useMemo(() => wochen.reduce((s, w) => s + w.count, 0), [wochen]);
 
   // Die Fehlerkartei ist ein Stapel wie jeder andere: sie sammelt automatisch,
   // was schon einmal falsch war. Wer hineinkommt, entscheidet unveraendert
@@ -534,7 +611,6 @@ export default function VokabelTrainer() {
        das Ueberfahren zeigt sich jetzt als leicht abgesetzte Flaeche. */
     .row-link { transition: background .15s; }
     .row-link:hover { background: ${T.surfaceElevated}; }
-    .stamp:hover { outline: 1px solid ${T.primary}; }
 
     /* Die Lernkarte kommt bei jedem Wechsel kurz herein - das macht den
        Kartenwechsel sichtbar, ohne den Lernfluss zu bremsen. */
@@ -874,13 +950,10 @@ export default function VokabelTrainer() {
                       {dueCards.length === 1 ? 'Karte fällig' : 'Karten fällig'}
                     </span>
                   </div>
-                  <div style={{ ...typoBody('sm'), color: T.textMuted, marginTop: SPACE.xs }}>
-                    {dueCards.length > 0
-                      ? <>{newCardsCount} neu · {reviewCount} Wiederholung{reviewCount !== 1 ? 'en' : ''}{reviewsToday > 0 ? ` · ${reviewsToday} heute geschafft` : ''}</>
-                      : reviewsToday > 0
-                        ? <>{reviewsToday} Karte{reviewsToday !== 1 ? 'n' : ''} heute wiederholt</>
-                        : <>Nichts fällig</>}
-                  </div>
+                  {/* Die Aufschluesselung "x neu · y Wiederholungen · z geschafft"
+                      stand hier und buchstabierte die Zahl darueber nach. Der Ring
+                      zeigt den Tagesfortschritt ohnehin, und neu/faellig steht je
+                      Kartenbox - eine dritte Fassung derselben Auskunft braucht es nicht. */}
                 </div>
                 {/* Der Ring begleitet die Zahl, statt sie zu ueberstrahlen. */}
                 <ProgressRing percent={dayPercent} track={T.primarySoft} color={T.primary} size={64} stroke={6} />
@@ -891,8 +964,10 @@ export default function VokabelTrainer() {
                   style={{ ...btnPrimary(T, 'lg'), flex: 1, minWidth: 200, opacity: dueCards.length === 0 ? .45 : 1, cursor: dueCards.length === 0 ? 'default' : 'pointer' }}>
                   Lernen starten <ChevronRight size={18} />
                 </button>
+                {/* Zurueckgenommen, damit "Lernen starten" die einzige gefuellte
+                    Hauptaktion des Bildschirms bleibt. */}
                 <button className="press" onClick={() => startStudy(null, null, false)} disabled={cards.length === 0}
-                  style={{ ...btnSecondary(T, 'lg'), opacity: cards.length === 0 ? .45 : 1 }}>
+                  style={{ ...btnOutline(T, 'lg'), opacity: cards.length === 0 ? .45 : 1 }}>
                   <Repeat size={16} /> Alle
                 </button>
               </div>
@@ -901,9 +976,14 @@ export default function VokabelTrainer() {
             {/* ---- 2. Statistiken ---- */}
             <div style={{ display: 'flex', gap: SPACE.xl, marginBottom: SPACE.xxxl, flexWrap: 'wrap' }}>
               {[
+                // Eine Regel statt zwei fast gleicher Gruentoene: Kennzahlen tragen
+                // T.primary. T.success/warning/error bleiben der unmittelbaren
+                // Rueckmeldung vorbehalten (Bewertungsknoepfe, Meldungen). Die
+                // Trefferquote trug bisher als einzige T.success - praktisch
+                // derselbe Ton, aber eben nicht derselbe.
                 ['Streak', `${streak}`, streak === 1 ? 'Tag' : 'Tage', streak > 0 ? T.primary : T.textSecondary],
                 ['Gelernt', `${learnedCount}`, learnedCount === 1 ? 'Karte' : 'Karten', T.textPrimary],
-                ['Trefferquote', `${successRate}`, '%', T.success],
+                ['Trefferquote', `${successRate}`, '%', T.primary],
               ].map(([label, wert, einheit, farbe]) => (
                 <div key={label} style={{ flex: 1, minWidth: 90 }}>
                   <div style={{ ...typoCaption(), color: T.textSecondary, marginBottom: SPACE.xs }}>{label}</div>
@@ -929,11 +1009,16 @@ export default function VokabelTrainer() {
                 </label>
               </div>
 
-              <div style={{ display: 'flex', flexDirection: 'column' }}>
+              {/* Ein Behaelter mit eigenem Grund: auf dem fast schwarzen Seitengrund
+                  verschwand die Liste sonst. Die Fehlerkartei liegt als letzte Zeile
+                  darin (Punkt 4 der Reihenfolge) - stuende sie in einem eigenen Block,
+                  klaffte zwischen zwei gleich aussehenden Zeilen ein Loch aus den
+                  Abstaenden beider Bloecke. */}
+              <div style={{ ...surfaceSoft(T), border: `1px solid ${T.hairline}`, padding: `0 ${SPACE.sm}px`, overflow: 'hidden' }}>
                 {decks.map((d, i) => (
                   <DeckZeile
                     key={d.key} T={T} trenner={i > 0}
-                    icon={d.type === 'gap' ? <PenLine size={17} color={T.textSecondary} /> : <BookOpen size={17} color={T.textSecondary} />}
+                    icon={d.type === 'gap' ? <PenLine size={18} strokeWidth={1.5} color={T.primary} /> : <BookOpen size={18} strokeWidth={1.5} color={T.primary} />}
                     name={d.label}
                     anzahl={d.total}
                     neu={d.neu}
@@ -942,9 +1027,22 @@ export default function VokabelTrainer() {
                     onLernen={() => startStudy(d.key, d.label)}
                   />
                 ))}
+                {/* Dieselbe Zeilenform wie ein Deck - nur die Form des Symbols sagt,
+                    dass sich dieser Stapel von selbst fuellt. */}
+                {difficultDeck.total > 0 && (
+                  <DeckZeile
+                    T={T} trenner={decks.length > 0}
+                    icon={<AlertTriangle size={18} strokeWidth={1.5} color={T.primary} />}
+                    name="Fehlerkartei"
+                    anzahl={difficultDeck.total}
+                    faellig={difficultDeck.due}
+                    lernbar
+                    onLernen={() => startStudy(DECK_FEHLER, 'Fehlerkartei', false)}
+                  />
+                )}
                 {decks.length === 0 && (
                   <div style={{ padding: `${SPACE.xxl}px ${SPACE.lg}px`, textAlign: 'center' }}>
-                    <BookOpen size={30} color={T.textSecondary} style={{ marginBottom: SPACE.md, opacity: .6 }} />
+                    <BookOpen size={30} strokeWidth={1.5} color={T.primary} style={{ marginBottom: SPACE.md, opacity: .6 }} />
                     <div style={{ ...typoH2(), marginBottom: SPACE.lg }}>Noch keine Karten</div>
                     <button className="press" onClick={() => setView('add')} style={btnPrimary(T)}>
                       <Plus size={16} /> Vokabeln anlegen
@@ -954,61 +1052,16 @@ export default function VokabelTrainer() {
               </div>
             </div>
 
-            {/* ---- 4. Fehlerkartei ----
-                Dieselbe Zeilenform wie ein Deck - nur das Symbol sagt, dass sich
-                dieser Stapel von selbst fuellt. Der Name steht in der Zeile und
-                nicht zusaetzlich als Ueberschrift darueber, sonst stuende er
-                zweimal da. */}
-            {difficultDeck.total > 0 && (
-              <div style={{ marginBottom: SPACE.xxxl }}>
-                <DeckZeile
-                  T={T}
-                  icon={<AlertTriangle size={17} color={T.warning} />}
-                  name="Fehlerkartei"
-                  anzahl={difficultDeck.total}
-                  faellig={difficultDeck.due}
-                  lernbar
-                  onLernen={() => startStudy(DECK_FEHLER, 'Fehlerkartei', false)}
-                />
-              </div>
-            )}
-
             {/* ---- 5. Aktivität ---- */}
             <div>
               <div style={{ ...typoH2(), marginBottom: SPACE.md }}>Aktivität</div>
               <div style={{ display: 'flex', alignItems: 'baseline', gap: SPACE.sm, marginBottom: SPACE.xs }}>
-                <span className="mono" style={{ ...typoNumber(), color: T.primary }}>
-                  {heatmap.weeks.flat().reduce((s, d) => s + d.count, 0)}
-                </span>
+                <span className="mono" style={{ ...typoNumber(), color: T.primary }}>{wochenSumme}</span>
                 <span style={{ ...typoCaption(), color: T.textSecondary }}>Wiederholungen</span>
               </div>
               <div style={{ fontSize: FONT.xs, color: T.textMuted, marginBottom: SPACE.lg }}>in den letzten 12 Wochen</div>
 
-              <div style={{ overflowX: 'auto', paddingBottom: 2 }}>
-                <div style={{ display: 'flex', gap: 3, width: 'max-content' }}>
-                  {heatmap.weeks.map((week, wi) => (
-                    <div key={wi} style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-                      {week.map(d => {
-                        const level = d.count === 0 ? 0 : Math.min(4, Math.ceil((d.count / heatmap.max) * 4));
-                        const bg = level === 0 ? T.surface : hexToRgba(T.primary, 0.22 + 0.195 * level);
-                        return <div key={d.date} className="stamp" title={`${d.date}: ${d.count} Wiederholungen`}
-                          style={{ width: 12, height: 12, borderRadius: 3, background: bg, transition: 'outline-color .15s' }} />;
-                      })}
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: SPACE.md, fontSize: FONT.xs, color: T.textMuted }}>
-                <span>12 Wochen</span>
-                <span style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
-                  weniger
-                  {[0, 1, 2, 3, 4].map(level => (
-                    <span key={level} style={{ width: 10, height: 10, borderRadius: 2, background: level === 0 ? T.surface : hexToRgba(T.primary, 0.22 + 0.195 * level) }} />
-                  ))}
-                  mehr
-                </span>
-              </div>
+              <WochenDiagramm T={T} wochen={wochen} />
             </div>
           </div>
         )}
