@@ -38,12 +38,15 @@ function defaultDataPath() {
 }
 
 function loadData(dataPath) {
-  if (!fs.existsSync(dataPath)) return { cards: [], activityLog: {} };
+  const leer = { cards: [], activityLog: {}, retention: RETENTION_DEFAULT };
+  if (!fs.existsSync(dataPath)) return leer;
   const raw = fs.readFileSync(dataPath, 'utf8');
-  if (!raw.trim()) return { cards: [], activityLog: {} };
+  if (!raw.trim()) return leer;
   const parsed = JSON.parse(raw);
   const cards = (parsed.cards || []).map(migrateCard);
-  return { cards, activityLog: parsed.activityLog || {} };
+  // Wird beim Speichern wieder mitgeschrieben, damit eine im Chat bewertete
+  // Karte dieselbe Faelligkeit bekommt wie in der App.
+  return { cards, activityLog: parsed.activityLog || {}, retention: clampRetention(parsed.retention) };
 }
 
 function saveData(dataPath, data) {
@@ -79,8 +82,17 @@ const W = [
 const FSRS_DECAY = -W[20];
 const FSRS_FACTOR = Math.pow(0.9, 1 / FSRS_DECAY) - 1;
 const STABILITY_MIN = 0.001;
-const DESIRED_RETENTION = 0.9;
 const MAX_INTERVAL = 36500;
+
+// Zielretention - siehe src/lib/fsrs.js fuer die Begruendung der Vorgabe. In
+// der App ist sie einstellbar; hier kommt sie aus der JSON-Datei (Feld
+// "retention", vom App-Export mitgeschrieben), damit Chat und App dieselben
+// Intervalle rechnen.
+const RETENTION_DEFAULT = 0.95;
+const RETENTION_MIN = 0.8;
+const RETENTION_MAX = 0.97;
+const clampRetention = (r) =>
+  Math.min(RETENTION_MAX, Math.max(RETENTION_MIN, Number.isFinite(r) ? r : RETENTION_DEFAULT));
 const RATING = { again: 1, hard: 2, good: 3, easy: 4 };
 const clampDifficulty = (d) => Math.min(10, Math.max(1, d));
 
@@ -111,9 +123,19 @@ function shortTermStability(S, r) {
   if (r !== RATING.again) inc = Math.max(inc, 1.0);
   return Math.max(S * inc, STABILITY_MIN);
 }
-function nextInterval(S) {
-  const raw = (S / FSRS_FACTOR) * (Math.pow(DESIRED_RETENTION, 1 / FSRS_DECAY) - 1);
+function nextInterval(S, retention = RETENTION_DEFAULT) {
+  const raw = (S / FSRS_FACTOR) * (Math.pow(clampRetention(retention), 1 / FSRS_DECAY) - 1);
   return Math.min(MAX_INTERVAL, Math.max(1, Math.round(raw)));
+}
+
+// Abstand zweier Lerntage in KALENDERTAGEN - siehe daysBetween() in
+// src/lib/srs.js: die fruehere Rundung auf die Uhrzeit zaehlte nachmittags
+// jedes Mal einen Tag zu viel und blaehte die Intervalle auf.
+function daysBetween(fromISO, toISO) {
+  const from = new Date(`${fromISO}T00:00:00.000Z`);
+  const to = new Date(`${toISO}T00:00:00.000Z`);
+  if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime())) return 0;
+  return Math.max(0, Math.round((to - from) / 86400000));
 }
 
 // Einmaliges Impfen von stability/difficulty fuer Karten aus der Zeit vor
@@ -128,7 +150,7 @@ function seedFromLegacy(card) {
 // Identisch zur rate()-Funktion in src/lib/srs.js - bewusst dupliziert statt
 // importiert, damit die Skill ohne Build-Schritt als reines Node-Script
 // laeuft und unabhaengig von der React-App bleibt.
-function rate(card, rating) {
+function rate(card, rating, retention = RETENTION_DEFAULT) {
   const c = { ...card };
   const r = RATING[rating];
   if (!r) throw new Error(`Unbekanntes Rating: ${rating}`);
@@ -145,9 +167,7 @@ function rate(card, rating) {
     c.stability = initialStability(r);
     c.difficulty = initialDifficulty(r);
   } else {
-    const elapsed = c.lastReviewed
-      ? Math.max(0, Math.round((today - new Date(`${c.lastReviewed}T00:00:00.000Z`)) / 86400000))
-      : 0;
+    const elapsed = c.lastReviewed ? daysBetween(c.lastReviewed, iso(today)) : 0;
     const difficulty = nextDifficulty(c.difficulty, r);
     let stability;
     if (elapsed === 0) {
@@ -162,7 +182,7 @@ function rate(card, rating) {
     c.difficulty = difficulty;
   }
 
-  c.interval = nextInterval(c.stability);
+  c.interval = nextInterval(c.stability, retention);
   const due = new Date(today);
   due.setDate(due.getDate() + c.interval);
   c.dueDate = iso(due);
@@ -321,7 +341,7 @@ function cmdRate(args, dataPath) {
   const data = loadData(dataPath);
   const idx = data.cards.findIndex(c => c.id === id);
   if (idx === -1) { console.error(`Keine Karte mit id ${id} gefunden.`); process.exit(1); }
-  const updated = rate(data.cards[idx], rating);
+  const updated = rate(data.cards[idx], rating, data.retention);
   data.cards[idx] = updated;
   data.activityLog[todayISO()] = (data.activityLog[todayISO()] || 0) + 1;
   saveData(dataPath, data);

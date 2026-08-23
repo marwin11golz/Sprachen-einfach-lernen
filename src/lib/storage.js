@@ -8,12 +8,15 @@
 //     activityLocal: {...},    // Lerntage DIESES Geräts
 //     activityRemote: {...},   // Summe aller anderen Geräte (kommt aus der Cloud)
 //     flipped: false,
+//     newCardsPerDay: 20,      // nur lokal, nicht Teil des Cloud-Abgleichs
+//     retention: 0.95,         // dito - Zielretention, steuert die Intervalle
 //     deviceId: "...",
 //     lastUserId: null,
 //     lastSyncAt: null
 //   }
 
 import { uid } from './srs.js';
+import { RETENTION_DEFAULT, clampRetention } from './fsrs.js';
 
 export const STORAGE_KEY = 'lucy-lernt-sprachen-vocab-data';
 export const DEVICE_KEY = 'lucy-lernt-sprachen-device-id';
@@ -29,6 +32,7 @@ function emptyState() {
     activityRemote: {},
     flipped: false,
     newCardsPerDay: 20,
+    retention: RETENTION_DEFAULT,
     prefsUpdatedAt: null,
     lastUserId: null,
     lastSyncAt: null,
@@ -116,6 +120,15 @@ export function loadLocal() {
     // Cloud-Prefs-Abgleichs (siehe useVocabStore.js): eine Lerntempo-
     // Praeferenz, kein Lernfortschritt.
     newCardsPerDay: Number.isFinite(parsed.newCardsPerDay) ? parsed.newCardsPerDay : 20,
+    // Zielretention - aus demselben Grund wie newCardsPerDay rein lokal: eine
+    // Lerntempo-Praeferenz, kein Fortschritt. Fehlt sie (Bestandsnutzer),
+    // greift die Vorgabe; die Faelligkeiten der vorhandenen Karten rechnet
+    // useVocabStore beim Laden einmalig nach.
+    retention: clampRetention(parsed.retention),
+    // Unterscheidet "der Nutzer hat einen Wert eingestellt" von "hier stand noch
+    // nie einer". Nur im zweiten Fall rechnet der Store die Faelligkeiten
+    // einmalig auf die neue Vorgabe um.
+    retentionWasStored: Number.isFinite(parsed.retention),
     prefsUpdatedAt: parsed.prefsUpdatedAt || null,
     lastUserId: parsed.lastUserId || null,
     lastSyncAt: parsed.lastSyncAt || null,
@@ -133,6 +146,7 @@ export function saveLocal(state) {
       activityRemote: state.activityRemote,
       flipped: state.flipped,
       newCardsPerDay: state.newCardsPerDay ?? 20,
+      retention: clampRetention(state.retention),
       prefsUpdatedAt: state.prefsUpdatedAt ?? null,
       lastUserId: state.lastUserId ?? null,
       lastSyncAt: state.lastSyncAt ?? null,

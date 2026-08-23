@@ -9,11 +9,29 @@
 import {
   RATING, initialStability, initialDifficulty, nextDifficulty,
   retrievability, nextStabilityRecall, nextStabilityForget, shortTermStability,
-  nextInterval, STABILITY_MIN,
+  nextInterval, STABILITY_MIN, RETENTION_DEFAULT,
 } from './fsrs.js';
 
 export const todayISO = () => new Date().toISOString().slice(0, 10);
 export const uid = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
+
+// Abstand zweier Lerntage in KALENDERTAGEN.
+//
+// Vorher wurde dafuer die Differenz zwischen der aktuellen UHRZEIT und
+// Mitternacht des letzten Lerntags gerundet. Das zaehlte systematisch falsch:
+// wer nachmittags lernte, lag ueber der halben Tagesgrenze und bekam bei
+// JEDER Wiederholung einen Tag zu viel angerechnet (zwei Kalendertage Abstand
+// wurden zu "elapsed = 3"). Das Modell hielt die Erinnerung dann fuer
+// belastbarer als sie war, liess die Stabilitaet zu stark wachsen und schob
+// die Karte immer weiter weg - genau die Beschwerde, dass gut gekonnte
+// Vokabeln nie wiederkommen. Beide Daten sind reine Tagesstempel, also
+// gehoert auch die Differenz auf Tagesebene gebildet.
+export function daysBetween(fromISO, toISO) {
+  const from = new Date(`${fromISO}T00:00:00.000Z`);
+  const to = new Date(`${toISO}T00:00:00.000Z`);
+  if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime())) return 0;
+  return Math.max(0, Math.round((to - from) / 86400000));
+}
 
 // Einmaliges Impfen von stability/difficulty für Karten aus der Zeit vor
 // FSRS: Das zuletzt gewählte Intervall IST bereits eine Schätzung, wie
@@ -30,7 +48,7 @@ function seedFromLegacy(card) {
 }
 
 // ---------- FSRS-Kern ----------
-export function rate(card, rating) {
+export function rate(card, rating, retention = RETENTION_DEFAULT) {
   const c = { ...card };
   const r = RATING[rating];
   const today = new Date();
@@ -47,9 +65,7 @@ export function rate(card, rating) {
     c.stability = initialStability(r);
     c.difficulty = initialDifficulty(r);
   } else {
-    const elapsed = c.lastReviewed
-      ? Math.max(0, Math.round((today - new Date(`${c.lastReviewed}T00:00:00.000Z`)) / 86400000))
-      : 0;
+    const elapsed = c.lastReviewed ? daysBetween(c.lastReviewed, iso(today)) : 0;
     const difficulty = nextDifficulty(c.difficulty, r);
     let stability;
     if (elapsed === 0) {
@@ -64,7 +80,7 @@ export function rate(card, rating) {
     c.difficulty = difficulty;
   }
 
-  c.interval = nextInterval(c.stability);
+  c.interval = nextInterval(c.stability, retention);
   const due = new Date(today);
   due.setDate(due.getDate() + c.interval);
   c.dueDate = iso(due);
@@ -80,6 +96,38 @@ export function rate(card, rating) {
   c.ease = Math.round((1.3 + ((10 - c.difficulty) / 9) * 1.7) * 100) / 100;
 
   c.lastReviewed = iso(today);
+  return c;
+}
+
+// Terminiert eine bereits gelernte Karte auf eine geaenderte Zielretention um.
+//
+// Ohne das wuerde ein neuer Regler nichts bewirken: Karten, die mit der alten,
+// flacheren Kurve schon 46 oder 163 Tage in die Zukunft geschoben wurden,
+// blieben genau dort liegen und tauchten monatelang nicht auf. Umgerechnet
+// wird ausschliesslich das Faelligkeitsdatum, und zwar aus der gespeicherten
+// Stabilitaet - der Lernfortschritt selbst (Stabilitaet, Schwierigkeit,
+// Zaehler, Trefferquote) bleibt unangetastet.
+//
+// Anders als sonst duerfen Karten hier bewusst springen: dass sie springen,
+// IST der Zweck. Deshalb werden Altkarten aus der Zeit vor FSRS hier auch
+// sofort geimpft statt wie ueblich erst bei ihrer naechsten Bewertung -
+// seedFromLegacy() liest das alte interval als Stabilitaetsschaetzung, und die
+// wuerde durch das neu gerechnete interval sonst verfaelscht.
+export function rescheduleCard(card, retention = RETENTION_DEFAULT) {
+  // Noch nie bewertete Karten haben keine Stabilitaet, die sich umrechnen
+  // liesse - sie sind ohnehin sofort faellig.
+  if (!card.lastReviewed || !(card.totalReviews > 0)) return card;
+
+  const c = { ...card };
+  if (c.stability == null) {
+    const seeded = seedFromLegacy(c);
+    c.stability = seeded.stability;
+    c.difficulty = seeded.difficulty;
+  }
+  c.interval = nextInterval(c.stability, retention);
+  const due = new Date(`${c.lastReviewed}T00:00:00.000Z`);
+  due.setUTCDate(due.getUTCDate() + c.interval);
+  c.dueDate = due.toISOString().slice(0, 10);
   return c;
 }
 

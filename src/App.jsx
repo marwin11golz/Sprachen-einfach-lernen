@@ -9,7 +9,7 @@ import {
   levenshtein, todayISO, cardSides,
   parseGapLine, revealSentence,
   deckKeyOf, deckLabelOf,
-  newVocabCard, newGapCard,
+  newVocabCard, newGapCard, rescheduleCard,
   VOCAB_PAIRS, SENTENCE_LANGS, langCodeOf,
 } from './lib/srs.js';
 import {
@@ -27,6 +27,19 @@ import SyncBadge from './ui/SyncBadge.jsx';
 // sondern eine eigene Marke - der Stapel schneidet quer durch alle Sprachpaare.
 // Das Praefix kann mit keinem Sprachpaar kollidieren.
 const DECK_FEHLER = '__fehlerkartei';
+
+// Wiederholungsdichte als benannte Stufen statt als nackte Prozentzahl: Der
+// Wert IST die Zielretention aus fsrs.js, aber "wie sicher soll eine Vokabel
+// beim Wiedersehen noch sitzen" ist nichts, was man im Vorbeigehen in Prozent
+// entscheidet. Die Beispiele nennen die Intervallreihe fuer "Gut" - daran
+// laesst sich die Wahl tatsaechlich festmachen.
+const DICHTE_STUFEN = [
+  { wert: 0.97, name: 'Sehr dicht', reihe: '1 · 2 · 4 · 7 · 13 Tage' },
+  { wert: 0.95, name: 'Gründlich', reihe: '1 · 3 · 8 · 19 · 43 Tage' },
+  { wert: 0.92, name: 'Ausgewogen', reihe: '2 · 8 · 28 · 87 Tage' },
+  { wert: 0.90, name: 'Locker', reihe: '2 · 11 · 46 · 163 Tage' },
+  { wert: 0.85, name: 'Sehr locker', reihe: '4 · 31 · 173 · 773 Tage' },
+];
 
 // Eine Stapelzeile: Name, Kartenzahl, Lernstand, Hauptaktion - in dieser
 // Rangfolge. Kartenboxen und Fehlerkartei teilen sie sich, damit die
@@ -177,6 +190,7 @@ export default function VokabelTrainer() {
     cards, allCards, activity,
     flipped, setFlipped,
     newCardsPerDay, setNewCardsPerDay,
+    retention, setRetention,
     loaded, storageWarning,
     addCards, rateCard, deleteCard, importData,
   } = store;
@@ -299,6 +313,24 @@ export default function VokabelTrainer() {
     () => cards.filter(c => c.totalReviews === 1 && c.lastReviewed === todayISO()).length,
     [cards],
   );
+  // Die eingestellte Stufe. Der Rueckfall auf die naechstliegende deckt Werte
+  // ab, die aus einer aelteren Fassung oder von Hand im Speicher stehen -
+  // sonst zeigte das Auswahlfeld einen leeren Eintrag.
+  const aktiveDichte = useMemo(() => (
+    DICHTE_STUFEN.find(s => Math.abs(s.wert - retention) < 1e-6)
+    ?? DICHTE_STUFEN.reduce((a, b) => (Math.abs(b.wert - retention) < Math.abs(a.wert - retention) ? b : a))
+  ), [retention]);
+
+  // Der Regler terminiert im Store auch den Bestand um. Die Rueckmeldung nennt
+  // die Zahl, um die es geht - die Aenderung waere sonst unsichtbar, weil sie
+  // sich nur in Datumsangaben niederschlaegt, die niemand vor sich hat.
+  const wechsleDichte = (wert) => {
+    setRetention(wert);
+    const faellig = cards.filter(c => rescheduleCard(c, wert).dueDate <= todayISO()).length;
+    const stufe = DICHTE_STUFEN.find(s => s.wert === wert);
+    showToast(`${stufe.name}: ${faellig} ${faellig === 1 ? 'Karte ist' : 'Karten sind'} jetzt fällig.`);
+  };
+
   const learnedCount = cards.filter(c => c.repetitions > 0).length;
   const totalReviewsAll = cards.reduce((s, c) => s + (c.totalReviews || 0), 0);
   const totalCorrect = cards.reduce((s, c) => s + (c.correct || 0), 0);
@@ -497,7 +529,10 @@ export default function VokabelTrainer() {
 
   const exportJSON = () => {
     // Grabsteine kommen bewusst mit, damit ein Import auch Loeschungen uebernimmt.
-    setExportText(JSON.stringify({ schemaVersion: 2, cards: allCards, activityLog: activity, flipped }, null, 2));
+    // retention faehrt mit, damit die Spanischcoach-Skill im Chat dieselben
+    // Intervalle rechnet wie die App. Beim Import wird sie bewusst NICHT
+    // uebernommen - es ist eine Einstellung des jeweiligen Geraets.
+    setExportText(JSON.stringify({ schemaVersion: 2, cards: allCards, activityLog: activity, flipped, retention }, null, 2));
   };
 
   const copyExportText = async () => {
@@ -999,14 +1034,33 @@ export default function VokabelTrainer() {
             <div style={{ marginBottom: SPACE.xxxl }}>
               <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: SPACE.md, gap: SPACE.sm }}>
                 <div style={{ ...typoH2() }}>Kartenboxen</div>
-                <label style={{ display: 'flex', alignItems: 'center', gap: SPACE.sm, fontSize: FONT.sm, color: T.textSecondary }}>
-                  Neu/Tag:
-                  <input
-                    type="number" min={0} value={newCardsPerDay}
-                    onChange={e => setNewCardsPerDay(Math.max(0, Number(e.target.value) || 0))}
-                    style={{ width: 52, padding: `${SPACE.xs}px ${SPACE.sm}px`, borderRadius: RADIUS.sm, border: `1px solid ${T.border}`, background: T.surfaceElevated, color: T.textPrimary, fontSize: FONT.sm, textAlign: 'center' }}
-                  />
-                </label>
+                <div style={{ display: 'flex', alignItems: 'center', gap: SPACE.lg, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: SPACE.sm, fontSize: FONT.sm, color: T.textSecondary }}>
+                    Neu/Tag:
+                    <input
+                      type="number" min={0} value={newCardsPerDay}
+                      onChange={e => setNewCardsPerDay(Math.max(0, Number(e.target.value) || 0))}
+                      style={{ width: 52, padding: `${SPACE.xs}px ${SPACE.sm}px`, borderRadius: RADIUS.sm, border: `1px solid ${T.border}`, background: T.surfaceElevated, color: T.textPrimary, fontSize: FONT.sm, textAlign: 'center' }}
+                    />
+                  </label>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: SPACE.sm, fontSize: FONT.sm, color: T.textSecondary }}>
+                    Wiederholung:
+                    <select
+                      value={aktiveDichte.wert}
+                      onChange={e => wechsleDichte(Number(e.target.value))}
+                      style={{ padding: `${SPACE.xs}px ${SPACE.sm}px`, borderRadius: RADIUS.sm, border: `1px solid ${T.border}`, background: T.surfaceElevated, color: T.textPrimary, fontSize: FONT.sm }}
+                    >
+                      {DICHTE_STUFEN.map(s => (
+                        <option key={s.wert} value={s.wert}>{s.name}</option>
+                      ))}
+                    </select>
+                  </label>
+                  {/* Die Stufe allein sagt nichts - erst die Intervallreihe macht
+                      greifbar, wann eine mit "Gut" bestaetigte Karte wiederkommt. */}
+                  <div style={{ ...typoCaption(), color: T.textMuted, flexBasis: '100%', textAlign: 'right' }}>
+                    „Gut“ kehrt zurück nach {aktiveDichte.reihe}
+                  </div>
+                </div>
               </div>
 
               {/* Ein Behaelter mit eigenem Grund: auf dem fast schwarzen Seitengrund
