@@ -9,7 +9,7 @@
 import {
   RATING, initialStability, initialDifficulty, nextDifficulty,
   retrievability, nextStabilityRecall, nextStabilityForget, shortTermStability,
-  nextInterval, STABILITY_MIN, RETENTION_DEFAULT,
+  nextInterval, STABILITY_MIN,
   earlyInterval, EARLY_COUNT,
 } from './fsrs.js';
 
@@ -49,7 +49,29 @@ function seedFromLegacy(card) {
 }
 
 // ---------- FSRS-Kern ----------
-export function rate(card, rating, retention = RETENTION_DEFAULT) {
+//
+// Was in das naechste Faelligkeitsdatum eingeht - alles davon steckt in den
+// wenigen Zeilen unten, auch wenn man es ihnen nicht ansieht:
+//
+//   Stabilitaet          c.stability, fortgeschrieben bei jeder Bewertung
+//   Schwierigkeit        c.difficulty, ueber nextDifficulty()
+//   Abrufwahrscheinlichk. retrievability(elapsed, S) - wie sicher die Karte
+//                        JETZT noch sass, bevor sie aufgedeckt wurde
+//   Zeit seit zuletzt    elapsed, in Kalendertagen (daysBetween)
+//   diese Bewertung      r, plus hardPenalty/easyBonus in nextStabilityRecall
+//   Vergessensereignisse jedes "Nochmal" laeuft durch nextStabilityForget und
+//                        hebt zugleich die Schwierigkeit - beides bleibt an der
+//                        Karte stehen und wirkt bei jeder spaeteren Rechnung mit
+//   fruehere Bewertungen kumuliert in genau diesen beiden Werten
+//   fruehere Intervalle  ebenso - die Stabilitaet IST die Schaetzung, wie viele
+//                        Tage die Erinnerung traegt
+//   Zielretention        fest 0,95 (RETENTION in fsrs.js), in nextInterval()
+//
+// FSRS fuehrt bewusst keinen eigenen Zaehler fuer Wiederholungen oder Lapses in
+// der Formel: Stabilitaet und Schwierigkeit SIND das Gedaechtnis der ganzen
+// Historie. Zwei Karten mit gleicher Bewertungsgeschichte landen deshalb beim
+// selben Datum, egal auf welchem Weg sie dorthin kamen.
+export function rate(card, rating) {
   const c = { ...card };
   const r = RATING[rating];
   const today = new Date();
@@ -92,7 +114,7 @@ export function rate(card, rating, retention = RETENTION_DEFAULT) {
   const stufe = Number.isFinite(c.earlyStep) ? c.earlyStep : (c.totalReviews || 0);
   const fest = earlyInterval(stufe, rating);
 
-  c.interval = fest != null ? fest : nextInterval(c.stability, retention);
+  c.interval = fest != null ? fest : nextInterval(c.stability);
   // Vergessen wirft auf den Anfang der Leiter zurueck, jede erinnerte
   // Bewertung rueckt eine Stufe weiter. Ist die Leiter durch, bleibt der
   // Zaehler stehen und FSRS terminiert von hier an allein.
@@ -116,21 +138,22 @@ export function rate(card, rating, retention = RETENTION_DEFAULT) {
   return c;
 }
 
-// Terminiert eine bereits gelernte Karte auf eine geaenderte Zielretention um.
+// Terminiert eine bereits gelernte Karte auf die feste Zielretention um.
 //
-// Ohne das wuerde ein neuer Regler nichts bewirken: Karten, die mit der alten,
-// flacheren Kurve schon 46 oder 163 Tage in die Zukunft geschoben wurden,
-// blieben genau dort liegen und tauchten monatelang nicht auf. Umgerechnet
-// wird ausschliesslich das Faelligkeitsdatum, und zwar aus der gespeicherten
-// Stabilitaet - der Lernfortschritt selbst (Stabilitaet, Schwierigkeit,
-// Zaehler, Trefferquote) bleibt unangetastet.
+// Gebraucht wird das nur noch als einmalige Umstellung beim Laden (siehe
+// useVocabStore): Karten aus der Zeit des Dichte-Reglers liegen mit einer
+// flacheren Kurve 163 oder 674 Tage in der Zukunft und wuerden von der festen
+// 0,95 sonst nie wieder erfasst. Umgerechnet wird ausschliesslich das
+// Faelligkeitsdatum, und zwar aus der gespeicherten Stabilitaet - der
+// Lernfortschritt selbst (Stabilitaet, Schwierigkeit, Zaehler, Trefferquote)
+// bleibt unangetastet.
 //
 // Anders als sonst duerfen Karten hier bewusst springen: dass sie springen,
 // IST der Zweck. Deshalb werden Altkarten aus der Zeit vor FSRS hier auch
 // sofort geimpft statt wie ueblich erst bei ihrer naechsten Bewertung -
 // seedFromLegacy() liest das alte interval als Stabilitaetsschaetzung, und die
 // wuerde durch das neu gerechnete interval sonst verfaelscht.
-export function rescheduleCard(card, retention = RETENTION_DEFAULT) {
+export function rescheduleCard(card) {
   // Noch nie bewertete Karten haben keine Stabilitaet, die sich umrechnen
   // liesse - sie sind ohnehin sofort faellig.
   if (!card.lastReviewed || !(card.totalReviews > 0)) return card;
@@ -146,7 +169,7 @@ export function rescheduleCard(card, retention = RETENTION_DEFAULT) {
     c.stability = seeded.stability;
     c.difficulty = seeded.difficulty;
   }
-  c.interval = nextInterval(c.stability, retention);
+  c.interval = nextInterval(c.stability);
   const due = new Date(`${c.lastReviewed}T00:00:00.000Z`);
   due.setUTCDate(due.getUTCDate() + c.interval);
   c.dueDate = due.toISOString().slice(0, 10);

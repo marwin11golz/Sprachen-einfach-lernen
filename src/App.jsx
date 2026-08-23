@@ -9,9 +9,10 @@ import {
   levenshtein, todayISO, cardSides,
   parseGapLine, revealSentence,
   deckKeyOf, deckLabelOf,
-  newVocabCard, newGapCard, rescheduleCard,
+  newVocabCard, newGapCard,
   VOCAB_PAIRS, SENTENCE_LANGS, langCodeOf,
 } from './lib/srs.js';
+import { RETENTION } from './lib/fsrs.js';
 import {
   THEMES, hexToRgba, SPACE, RADIUS, FONT, NAVBAR_H,
   btnPrimary, btnSecondary, btnGhost, btnOutline, pill, ratingBtn, surface, surfaceSoft, divider,
@@ -27,30 +28,6 @@ import SyncBadge from './ui/SyncBadge.jsx';
 // sondern eine eigene Marke - der Stapel schneidet quer durch alle Sprachpaare.
 // Das Praefix kann mit keinem Sprachpaar kollidieren.
 const DECK_FEHLER = '__fehlerkartei';
-
-// Wiederholungsdichte als benannte Stufen statt als nackte Prozentzahl: Der
-// Wert IST die Zielretention aus fsrs.js, aber "wie sicher soll eine Vokabel
-// beim Wiedersehen noch sitzen" ist nichts, was man im Vorbeigehen in Prozent
-// entscheidet.
-//
-// Die Stufennamen bilden eine Skala von dicht nach locker und tragen die
-// Bedeutung allein - Zahlen stehen bewusst nirgends in der Oberflaeche. Die
-// Terminierung ist Hintergrundarbeit; wer beim Bewerten liest, dass eine Karte
-// erst in 272 Tagen wiederkommt, bewertet ab da die Zahl statt sein Wissen.
-// Zur Einordnung, welche Stufe was bedeutet - die Reihe, die eine mit "Gut"
-// bestaetigte Karte NACH der festen Anfangsphase (EARLY_STEPS) durchlaeuft:
-//   0.97  150 · 221 · 320 Tage
-//   0.95  272 · 488 · 841 Tage
-//   0.92  493 · 1130 · 2400 Tage
-//   0.90  674 · 1770 · 4222 Tage
-//   0.85  1286 · 4485 · 13553 Tage
-const DICHTE_STUFEN = [
-  { wert: 0.97, name: 'Sehr dicht' },
-  { wert: 0.95, name: 'Gründlich' },
-  { wert: 0.92, name: 'Ausgewogen' },
-  { wert: 0.90, name: 'Locker' },
-  { wert: 0.85, name: 'Sehr locker' },
-];
 
 // Eine Stapelzeile: Name, Kartenzahl, Lernstand, Hauptaktion - in dieser
 // Rangfolge. Kartenboxen und Fehlerkartei teilen sie sich, damit die
@@ -201,7 +178,6 @@ export default function VokabelTrainer() {
     cards, allCards, activity,
     flipped, setFlipped,
     newCardsPerDay, setNewCardsPerDay,
-    retention, setRetention,
     loaded, storageWarning,
     addCards, rateCard, deleteCard, importData,
   } = store;
@@ -324,24 +300,6 @@ export default function VokabelTrainer() {
     () => cards.filter(c => c.totalReviews === 1 && c.lastReviewed === todayISO()).length,
     [cards],
   );
-  // Die eingestellte Stufe. Der Rueckfall auf die naechstliegende deckt Werte
-  // ab, die aus einer aelteren Fassung oder von Hand im Speicher stehen -
-  // sonst zeigte das Auswahlfeld einen leeren Eintrag.
-  const aktiveDichte = useMemo(() => (
-    DICHTE_STUFEN.find(s => Math.abs(s.wert - retention) < 1e-6)
-    ?? DICHTE_STUFEN.reduce((a, b) => (Math.abs(b.wert - retention) < Math.abs(a.wert - retention) ? b : a))
-  ), [retention]);
-
-  // Der Regler terminiert im Store auch den Bestand um. Die Rueckmeldung nennt
-  // die Zahl, um die es geht - die Aenderung waere sonst unsichtbar, weil sie
-  // sich nur in Datumsangaben niederschlaegt, die niemand vor sich hat.
-  const wechsleDichte = (wert) => {
-    setRetention(wert);
-    const faellig = cards.filter(c => rescheduleCard(c, wert).dueDate <= todayISO()).length;
-    const stufe = DICHTE_STUFEN.find(s => s.wert === wert);
-    showToast(`${stufe.name}: ${faellig} ${faellig === 1 ? 'Karte ist' : 'Karten sind'} jetzt fällig.`);
-  };
-
   const learnedCount = cards.filter(c => c.repetitions > 0).length;
   const totalReviewsAll = cards.reduce((s, c) => s + (c.totalReviews || 0), 0);
   const totalCorrect = cards.reduce((s, c) => s + (c.correct || 0), 0);
@@ -545,10 +503,10 @@ export default function VokabelTrainer() {
 
   const exportJSON = () => {
     // Grabsteine kommen bewusst mit, damit ein Import auch Loeschungen uebernimmt.
-    // retention faehrt mit, damit die Spanischcoach-Skill im Chat dieselben
-    // Intervalle rechnet wie die App. Beim Import wird sie bewusst NICHT
-    // uebernommen - es ist eine Einstellung des jeweiligen Geraets.
-    setExportText(JSON.stringify({ schemaVersion: 2, cards: allCards, activityLog: activity, flipped, retention }, null, 2));
+    // retention faehrt als fester Wert mit: die Spanischcoach-Skill liest sie
+    // aus der JSON, und so bleibt die Datei auch dann eindeutig, wenn sie in
+    // einem Stand landet, der die Zielretention noch fuer einstellbar haelt.
+    setExportText(JSON.stringify({ schemaVersion: 2, cards: allCards, activityLog: activity, flipped, retention: RETENTION }, null, 2));
   };
 
   const copyExportText = async () => {
@@ -1058,18 +1016,6 @@ export default function VokabelTrainer() {
                       onChange={e => setNewCardsPerDay(Math.max(0, Number(e.target.value) || 0))}
                       style={{ width: 52, padding: `${SPACE.xs}px ${SPACE.sm}px`, borderRadius: RADIUS.sm, border: `1px solid ${T.border}`, background: T.surfaceElevated, color: T.textPrimary, fontSize: FONT.sm, textAlign: 'center' }}
                     />
-                  </label>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: SPACE.sm, fontSize: FONT.sm, color: T.textSecondary }}>
-                    Wiederholung:
-                    <select
-                      value={aktiveDichte.wert}
-                      onChange={e => wechsleDichte(Number(e.target.value))}
-                      style={{ padding: `${SPACE.xs}px ${SPACE.sm}px`, borderRadius: RADIUS.sm, border: `1px solid ${T.border}`, background: T.surfaceElevated, color: T.textPrimary, fontSize: FONT.sm }}
-                    >
-                      {DICHTE_STUFEN.map(s => (
-                        <option key={s.wert} value={s.wert}>{s.name}</option>
-                      ))}
-                    </select>
                   </label>
                 </div>
               </div>

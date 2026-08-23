@@ -9,14 +9,15 @@
 //     activityRemote: {...},   // Summe aller anderen Geräte (kommt aus der Cloud)
 //     flipped: false,
 //     newCardsPerDay: 20,      // nur lokal, nicht Teil des Cloud-Abgleichs
-//     retention: 0.95,         // dito - Zielretention, steuert die Intervalle
+//     retention: 0.95,         // Marke, auf welche Zielretention der Bestand
+//                              // gerechnet ist - nicht mehr einstellbar
 //     deviceId: "...",
 //     lastUserId: null,
 //     lastSyncAt: null
 //   }
 
 import { uid } from './srs.js';
-import { RETENTION_DEFAULT, clampRetention } from './fsrs.js';
+import { RETENTION } from './fsrs.js';
 
 export const STORAGE_KEY = 'lucy-lernt-sprachen-vocab-data';
 export const DEVICE_KEY = 'lucy-lernt-sprachen-device-id';
@@ -32,7 +33,6 @@ function emptyState() {
     activityRemote: {},
     flipped: false,
     newCardsPerDay: 20,
-    retention: RETENTION_DEFAULT,
     prefsUpdatedAt: null,
     lastUserId: null,
     lastSyncAt: null,
@@ -120,15 +120,14 @@ export function loadLocal() {
     // Cloud-Prefs-Abgleichs (siehe useVocabStore.js): eine Lerntempo-
     // Praeferenz, kein Lernfortschritt.
     newCardsPerDay: Number.isFinite(parsed.newCardsPerDay) ? parsed.newCardsPerDay : 20,
-    // Zielretention - aus demselben Grund wie newCardsPerDay rein lokal: eine
-    // Lerntempo-Praeferenz, kein Fortschritt. Fehlt sie (Bestandsnutzer),
-    // greift die Vorgabe; die Faelligkeiten der vorhandenen Karten rechnet
-    // useVocabStore beim Laden einmalig nach.
-    retention: clampRetention(parsed.retention),
-    // Unterscheidet "der Nutzer hat einen Wert eingestellt" von "hier stand noch
-    // nie einer". Nur im zweiten Fall rechnet der Store die Faelligkeiten
-    // einmalig auf die neue Vorgabe um.
-    retentionWasStored: Number.isFinite(parsed.retention),
+    // Die Zielretention ist fest (RETENTION in fsrs.js) und nicht mehr
+    // einstellbar. Der gespeicherte Wert ist nur noch die Marke, auf welche
+    // Retention der Kartenbestand gerechnet ist: steht dort etwas anderes -
+    // ein alter Reglerwert, oder gar nichts, weil der Stand aelter ist als die
+    // Zielretention selbst - dann liegen die Faelligkeiten auf einer anderen
+    // Kurve und der Store rechnet sie beim Laden einmalig um. Danach steht hier
+    // 0,95 und die Umstellung laeuft nie wieder.
+    needsRetentionReset: parsed.retention !== RETENTION,
     prefsUpdatedAt: parsed.prefsUpdatedAt || null,
     lastUserId: parsed.lastUserId || null,
     lastSyncAt: parsed.lastSyncAt || null,
@@ -146,7 +145,9 @@ export function saveLocal(state) {
       activityRemote: state.activityRemote,
       flipped: state.flipped,
       newCardsPerDay: state.newCardsPerDay ?? 20,
-      retention: clampRetention(state.retention),
+      // Immer der feste Wert: die Marke sagt, auf welche Zielretention der
+      // Bestand gerechnet ist, und ab hier ist das immer 0,95.
+      retention: RETENTION,
       prefsUpdatedAt: state.prefsUpdatedAt ?? null,
       lastUserId: state.lastUserId ?? null,
       lastSyncAt: state.lastSyncAt ?? null,

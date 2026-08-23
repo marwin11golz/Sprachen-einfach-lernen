@@ -38,15 +38,16 @@ function defaultDataPath() {
 }
 
 function loadData(dataPath) {
-  const leer = { cards: [], activityLog: {}, retention: RETENTION_DEFAULT };
+  const leer = { cards: [], activityLog: {}, retention: RETENTION };
   if (!fs.existsSync(dataPath)) return leer;
   const raw = fs.readFileSync(dataPath, 'utf8');
   if (!raw.trim()) return leer;
   const parsed = JSON.parse(raw);
   const cards = (parsed.cards || []).map(migrateCard);
-  // Wird beim Speichern wieder mitgeschrieben, damit eine im Chat bewertete
-  // Karte dieselbe Faelligkeit bekommt wie in der App.
-  return { cards, activityLog: parsed.activityLog || {}, retention: clampRetention(parsed.retention) };
+  // Die Zielretention ist fest; der Wert aus der Datei wird bewusst NICHT
+  // uebernommen. Eine aeltere Datei kann noch einen Reglerwert tragen - der
+  // wuerde hier sonst andere Faelligkeiten ergeben als in der App.
+  return { cards, activityLog: parsed.activityLog || {}, retention: RETENTION };
 }
 
 function saveData(dataPath, data) {
@@ -84,15 +85,12 @@ const FSRS_FACTOR = Math.pow(0.9, 1 / FSRS_DECAY) - 1;
 const STABILITY_MIN = 0.001;
 const MAX_INTERVAL = 36500;
 
-// Zielretention - siehe src/lib/fsrs.js fuer die Begruendung der Vorgabe. In
-// der App ist sie einstellbar; hier kommt sie aus der JSON-Datei (Feld
-// "retention", vom App-Export mitgeschrieben), damit Chat und App dieselben
-// Intervalle rechnen.
-const RETENTION_DEFAULT = 0.95;
-const RETENTION_MIN = 0.8;
-const RETENTION_MAX = 0.97;
-const clampRetention = (r) =>
-  Math.min(RETENTION_MAX, Math.max(RETENTION_MIN, Number.isFinite(r) ? r : RETENTION_DEFAULT));
+// Zielretention - siehe src/lib/fsrs.js fuer die Begruendung. FEST auf 0,95,
+// in App und Script gleichermassen: es gibt keinen Regler mehr, also auch
+// nichts, was aus der JSON-Datei uebernommen werden muesste. Genau deshalb
+// rechnen Chat und App dieselben Intervalle, ohne dass die Datei sie tragen
+// muss.
+const RETENTION = 0.95;
 const RATING = { again: 1, hard: 2, good: 3, easy: 4 };
 const clampDifficulty = (d) => Math.min(10, Math.max(1, d));
 
@@ -139,8 +137,8 @@ function shortTermStability(S, r) {
   if (r !== RATING.again) inc = Math.max(inc, 1.0);
   return Math.max(S * inc, STABILITY_MIN);
 }
-function nextInterval(S, retention = RETENTION_DEFAULT) {
-  const raw = (S / FSRS_FACTOR) * (Math.pow(clampRetention(retention), 1 / FSRS_DECAY) - 1);
+function nextInterval(S) {
+  const raw = (S / FSRS_FACTOR) * (Math.pow(RETENTION, 1 / FSRS_DECAY) - 1);
   return Math.min(MAX_INTERVAL, Math.max(1, Math.round(raw)));
 }
 
@@ -166,7 +164,7 @@ function seedFromLegacy(card) {
 // Identisch zur rate()-Funktion in src/lib/srs.js - bewusst dupliziert statt
 // importiert, damit die Skill ohne Build-Schritt als reines Node-Script
 // laeuft und unabhaengig von der React-App bleibt.
-function rate(card, rating, retention = RETENTION_DEFAULT) {
+function rate(card, rating) {
   const c = { ...card };
   const r = RATING[rating];
   if (!r) throw new Error(`Unbekanntes Rating: ${rating}`);
@@ -202,7 +200,7 @@ function rate(card, rating, retention = RETENTION_DEFAULT) {
   // weiter, uebersteuert ist nur die Wahl des Faelligkeitsdatums.
   const stufe = Number.isFinite(c.earlyStep) ? c.earlyStep : (c.totalReviews || 0);
   const fest = earlyInterval(stufe, rating);
-  c.interval = fest != null ? fest : nextInterval(c.stability, retention);
+  c.interval = fest != null ? fest : nextInterval(c.stability);
   c.earlyStep = rating === 'again' ? 0 : Math.min(EARLY_COUNT, stufe + 1);
 
   const due = new Date(today);
@@ -363,7 +361,7 @@ function cmdRate(args, dataPath) {
   const data = loadData(dataPath);
   const idx = data.cards.findIndex(c => c.id === id);
   if (idx === -1) { console.error(`Keine Karte mit id ${id} gefunden.`); process.exit(1); }
-  const updated = rate(data.cards[idx], rating, data.retention);
+  const updated = rate(data.cards[idx], rating);
   data.cards[idx] = updated;
   data.activityLog[todayISO()] = (data.activityLog[todayISO()] || 0) + 1;
   saveData(dataPath, data);

@@ -23,21 +23,24 @@ export const STABILITY_MIN = 0.001;
 const MAX_INTERVAL = 36500;
 
 // Zielretention: Wie sicher eine Karte beim Wiedersehen noch sitzen soll.
-// Sie ist der einzige Regler, mit dem sich die Wiederholungsdichte steuern
-// laesst - je hoeher, desto frueher kommt eine Karte zurueck.
+// FEST auf 0,95 - kein Regler, keine Einstellung.
 //
-// Die Vorgabe liegt bewusst ueber dem Anki-Standard von 0,9. Bei 0,9 waechst
-// eine mit "Gut" bestaetigte Karte auf 2 → 11 → 46 → 163 Tage; wer ein paar
-// Tage aussetzt, sieht danach nur noch die Karten wieder, die er oft falsch
-// hatte, waehrend alles Gekonnte monatelang unsichtbar bleibt. Das ist zwar
+// Der Wert liegt bewusst ueber dem Anki-Standard von 0,9. Bei 0,9 waechst eine
+// mit "Gut" bestaetigte Karte auf 2 → 11 → 46 → 163 Tage; wer ein paar Tage
+// aussetzt, sieht danach nur noch die Karten wieder, die er oft falsch hatte,
+// waehrend alles Gekonnte monatelang unsichtbar bleibt. Das ist zwar
 // algorithmisch korrekt (FSRS rechnet fuer grosse Sammlungen auf Effizienz),
 // fuehlt sich bei einer kleinen, jungen Kartei aber wie das Gegenteil von
-// Festigen an. Bei 0,95 lautet dieselbe Reihe 1 → 3 → 8 → 19 → 43 Tage.
-export const RETENTION_DEFAULT = 0.95;
-export const RETENTION_MIN = 0.8;
-export const RETENTION_MAX = 0.97;
-export const clampRetention = (r) =>
-  Math.min(RETENTION_MAX, Math.max(RETENTION_MIN, Number.isFinite(r) ? r : RETENTION_DEFAULT));
+// Festigen an.
+//
+// Warum ein fester Wert und kein Regler: Die Zielretention ist die einzige
+// Groesse im Modell, die NICHT aus dem Lernverhalten stammt - alles andere
+// (Stabilitaet, Schwierigkeit, Abrufwahrscheinlichkeit) rechnet FSRS aus den
+// tatsaechlichen Bewertungen. Ein Regler daneben laedt dazu ein, an der
+// Terminierung zu drehen, statt die Bewertungen sprechen zu lassen; die
+// Verlaengerung, die man sich davon verspricht, entsteht ohnehin von selbst,
+// sobald eine Karte wirklich sitzt.
+export const RETENTION = 0.95;
 
 export const RATING = { again: 1, hard: 2, good: 3, easy: 4 };
 
@@ -128,10 +131,9 @@ export function shortTermStability(S, r) {
   return Math.max(S * inc, STABILITY_MIN);
 }
 
-// Bei Zielretention 0,9 ergaebe das rechnerisch genau round(S) - deshalb stand
-// hier frueher der feste Wert. Jetzt kommt die Zielretention von aussen (siehe
-// RETENTION_DEFAULT), damit sich die Wiederholungsdichte einstellen laesst.
-export function nextInterval(S, retention = RETENTION_DEFAULT) {
-  const raw = (S / FACTOR) * (Math.pow(clampRetention(retention), 1 / DECAY) - 1);
+// Der Abstand, nach dem die Abrufwahrscheinlichkeit auf RETENTION gefallen ist.
+// Bei 0,9 ergaebe das rechnerisch genau round(S); bei 0,95 entsprechend weniger.
+export function nextInterval(S) {
+  const raw = (S / FACTOR) * (Math.pow(RETENTION, 1 / DECAY) - 1);
   return Math.min(MAX_INTERVAL, Math.max(1, Math.round(raw)));
 }
