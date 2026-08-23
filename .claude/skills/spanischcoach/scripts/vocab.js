@@ -96,6 +96,22 @@ const clampRetention = (r) =>
 const RATING = { again: 1, hard: 2, good: 3, easy: 4 };
 const clampDifficulty = (d) => Math.min(10, Math.max(1, d));
 
+// Feste Anfangsphase - woertlich aus src/lib/fsrs.js gespiegelt. Weicht sie ab,
+// landet dieselbe Karte im Chat auf einem anderen Termin als in der App.
+// Stufe 0 bei "hard" ist der Zehn-Minuten-Schritt: Intervall 0, die Karte
+// bleibt heute faellig.
+const EARLY_STEPS = {
+  hard: [0, 1, 2, 4, 7, 12, 20],
+  good: [1, 3, 7, 16, 35, 70, 140],
+  easy: [3, 7, 18, 40, 80, 160, 320],
+};
+const EARLY_COUNT = EARLY_STEPS.good.length;
+function earlyInterval(step, rating) {
+  const reihe = EARLY_STEPS[rating];
+  if (!reihe || !(step >= 0) || step >= reihe.length) return null;
+  return reihe[step];
+}
+
 function initialStability(r) { return Math.max(W[r - 1], STABILITY_MIN); }
 function initialDifficulty(r) { return clampDifficulty(W[4] - Math.exp(W[5] * (r - 1)) + 1); }
 function nextDifficulty(D, r) {
@@ -182,7 +198,13 @@ function rate(card, rating, retention = RETENTION_DEFAULT) {
     c.difficulty = difficulty;
   }
 
-  c.interval = nextInterval(c.stability, retention);
+  // Feste Anfangsphase - gespiegelt aus src/lib/srs.js. FSRS rechnet daneben
+  // weiter, uebersteuert ist nur die Wahl des Faelligkeitsdatums.
+  const stufe = Number.isFinite(c.earlyStep) ? c.earlyStep : (c.totalReviews || 0);
+  const fest = earlyInterval(stufe, rating);
+  c.interval = fest != null ? fest : nextInterval(c.stability, retention);
+  c.earlyStep = rating === 'again' ? 0 : Math.min(EARLY_COUNT, stufe + 1);
+
   const due = new Date(today);
   due.setDate(due.getDate() + c.interval);
   c.dueDate = iso(due);
@@ -201,7 +223,7 @@ function newCard(fields) {
   return {
     id: uid(),
     ease: 2.5, interval: 0, repetitions: 0, dueDate: todayISO(),
-    stability: null, difficulty: null,
+    stability: null, difficulty: null, earlyStep: 0,
     createdAt: todayISO(), lastReviewed: null, totalReviews: 0, correct: 0, wrong: 0,
     updatedAt: new Date().toISOString(), deleted: false,
     ...fields,

@@ -41,6 +41,40 @@ export const clampRetention = (r) =>
 
 export const RATING = { again: 1, hard: 2, good: 3, easy: 4 };
 
+// ---------- Feste Anfangsphase ----------
+// Die ersten sieben Wiederholungen einer Karte laufen auf festen Abstaenden,
+// erst danach rechnet FSRS die Intervalle selbst weiter.
+//
+// Grund: die Referenzgewichte sind auf grosse Anki-Sammlungen angepasst, in
+// denen "Einfach" sparsam benutzt wird. Fuer eine kleine, junge Kartei ist der
+// Zuwachs dort zu steil - eine Vokabel, die erst zweimal als "Einfach"
+// bewertet wurde, laege sonst schon 52 Tage in der Zukunft und danach bei 167.
+//
+// Die Stufe 0 fuer "Schwer" ist der Zehn-Minuten-Schritt: an Tagesabstaenden
+// gemessen bleibt die Karte heute faellig und kommt in derselben Sitzung
+// wieder (siehe submitRating in App.jsx). Eine Uhrzeit gibt es hier bewusst
+// nicht - dueDate ist ein Datum.
+//
+// "Nochmal" steht absichtlich nicht in der Tabelle: eine vergessene Karte
+// bekommt weiter das Intervall, das FSRS aus ihrer eigenen Stabilitaet
+// errechnet. Sie faellt dafuer auf Stufe 1 zurueck (siehe rate()), sonst
+// bekaeme eine gerade vergessene Karte beim naechsten "Gut" die 70 Tage der
+// Stufe 6.
+export const EARLY_STEPS = {
+  hard: [0, 1, 2, 4, 7, 12, 20],
+  good: [1, 3, 7, 16, 35, 70, 140],
+  easy: [3, 7, 18, 40, 80, 160, 320],
+};
+export const EARLY_COUNT = EARLY_STEPS.good.length;
+
+// Das feste Intervall fuer diese Stufe, oder null, wenn die Anfangsphase
+// vorbei ist oder die Bewertung keine Leiter hat ("Nochmal").
+export function earlyInterval(step, rating) {
+  const reihe = EARLY_STEPS[rating];
+  if (!reihe || !(step >= 0) || step >= reihe.length) return null;
+  return reihe[step];
+}
+
 const clampDifficulty = (d) => Math.min(10, Math.max(1, d));
 
 export function initialStability(r) {

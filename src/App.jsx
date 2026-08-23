@@ -12,6 +12,7 @@ import {
   newVocabCard, newGapCard, rescheduleCard,
   VOCAB_PAIRS, SENTENCE_LANGS, langCodeOf,
 } from './lib/srs.js';
+import { EARLY_STEPS } from './lib/fsrs.js';
 import {
   THEMES, hexToRgba, SPACE, RADIUS, FONT, NAVBAR_H,
   btnPrimary, btnSecondary, btnGhost, btnOutline, pill, ratingBtn, surface, surfaceSoft, divider,
@@ -33,12 +34,16 @@ const DECK_FEHLER = '__fehlerkartei';
 // beim Wiedersehen noch sitzen" ist nichts, was man im Vorbeigehen in Prozent
 // entscheidet. Die Beispiele nennen die Intervallreihe fuer "Gut" - daran
 // laesst sich die Wahl tatsaechlich festmachen.
+// Die Zielretention greift erst NACH der festen Anfangsphase - deren sieben
+// Abstaende stehen in EARLY_STEPS und haengen an keinem Regler. Die Reihen hier
+// sind deshalb die, mit denen FSRS danach weiterrechnet, nicht die von Anfang
+// an. Alles andere waere ein Versprechen, das die Leiter ueberstimmt.
 const DICHTE_STUFEN = [
-  { wert: 0.97, name: 'Sehr dicht', reihe: '1 · 2 · 4 · 7 · 13 Tage' },
-  { wert: 0.95, name: 'Gründlich', reihe: '1 · 3 · 8 · 19 · 43 Tage' },
-  { wert: 0.92, name: 'Ausgewogen', reihe: '2 · 8 · 28 · 87 Tage' },
-  { wert: 0.90, name: 'Locker', reihe: '2 · 11 · 46 · 163 Tage' },
-  { wert: 0.85, name: 'Sehr locker', reihe: '4 · 31 · 173 · 773 Tage' },
+  { wert: 0.97, name: 'Sehr dicht', reihe: '150 · 221 · 320 Tage' },
+  { wert: 0.95, name: 'Gründlich', reihe: '272 · 488 · 841 Tage' },
+  { wert: 0.92, name: 'Ausgewogen', reihe: '493 · 1130 · 2400 Tage' },
+  { wert: 0.90, name: 'Locker', reihe: '674 · 1770 · 4222 Tage' },
+  { wert: 0.85, name: 'Sehr locker', reihe: '1286 · 4485 · 13553 Tage' },
 ];
 
 // Eine Stapelzeile: Name, Kartenzahl, Lernstand, Hauptaktion - in dieser
@@ -447,7 +452,12 @@ export default function VokabelTrainer() {
     const updated = rateCard(current.id, ratingKey);
     if (!updated) { setCurrent(null); return; }
     let rest = queue.slice(1);
-    if (ratingKey === 'again') {
+    // Zurueck in die Warteschlange kommt, was heute noch einmal drankommen
+    // soll: eine vergessene Karte, und der Zehn-Minuten-Schritt der festen
+    // Anfangsphase (Intervall 0). Ein Datum kann keine zehn Minuten
+    // ausdruecken - dass die Karte in derselben Sitzung wiederkehrt, ist die
+    // Entsprechung dazu.
+    if (ratingKey === 'again' || updated.interval === 0) {
       const pos = Math.min(rest.length, 3);
       rest = [...rest.slice(0, pos), updated, ...rest.slice(pos)];
     }
@@ -1056,9 +1066,11 @@ export default function VokabelTrainer() {
                     </select>
                   </label>
                   {/* Die Stufe allein sagt nichts - erst die Intervallreihe macht
-                      greifbar, wann eine mit "Gut" bestaetigte Karte wiederkommt. */}
+                      greifbar, wann eine mit "Gut" bestaetigte Karte wiederkommt.
+                      Beide Teile stehen da, weil der Regler nur den zweiten
+                      betrifft. */}
                   <div style={{ ...typoCaption(), color: T.textMuted, flexBasis: '100%', textAlign: 'right' }}>
-                    „Gut“ kehrt zurück nach {aktiveDichte.reihe}
+                    „Gut“ fest auf {EARLY_STEPS.good.join(' · ')} Tage, danach {aktiveDichte.reihe}
                   </div>
                 </div>
               </div>

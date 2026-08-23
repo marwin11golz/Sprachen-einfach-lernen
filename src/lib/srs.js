@@ -10,6 +10,7 @@ import {
   RATING, initialStability, initialDifficulty, nextDifficulty,
   retrievability, nextStabilityRecall, nextStabilityForget, shortTermStability,
   nextInterval, STABILITY_MIN, RETENTION_DEFAULT,
+  earlyInterval, EARLY_COUNT,
 } from './fsrs.js';
 
 export const todayISO = () => new Date().toISOString().slice(0, 10);
@@ -80,7 +81,23 @@ export function rate(card, rating, retention = RETENTION_DEFAULT) {
     c.difficulty = difficulty;
   }
 
-  c.interval = nextInterval(c.stability, retention);
+  // Anfangsphase: die ersten sieben Wiederholungen laufen auf festen
+  // Abstaenden, FSRS rechnet daneben trotzdem weiter. Das ist Absicht - die
+  // Stabilitaet wird aus den TATSAECHLICH verstrichenen Tagen fortgeschrieben,
+  // das Modell bleibt also stimmig, und nach der Leiter kann es nahtlos
+  // uebernehmen. Nur die Wahl des Faelligkeitsdatums ist hier uebersteuert.
+  //
+  // Die Stufe zaehlt an der Karte mit, statt aus totalReviews abgeleitet zu
+  // werden: nur so kann "Nochmal" sie zuruecksetzen.
+  const stufe = Number.isFinite(c.earlyStep) ? c.earlyStep : (c.totalReviews || 0);
+  const fest = earlyInterval(stufe, rating);
+
+  c.interval = fest != null ? fest : nextInterval(c.stability, retention);
+  // Vergessen wirft auf den Anfang der Leiter zurueck, jede erinnerte
+  // Bewertung rueckt eine Stufe weiter. Ist die Leiter durch, bleibt der
+  // Zaehler stehen und FSRS terminiert von hier an allein.
+  c.earlyStep = rating === 'again' ? 0 : Math.min(EARLY_COUNT, stufe + 1);
+
   const due = new Date(today);
   due.setDate(due.getDate() + c.interval);
   c.dueDate = iso(due);
@@ -117,6 +134,11 @@ export function rescheduleCard(card, retention = RETENTION_DEFAULT) {
   // Noch nie bewertete Karten haben keine Stabilitaet, die sich umrechnen
   // liesse - sie sind ohnehin sofort faellig.
   if (!card.lastReviewed || !(card.totalReviews > 0)) return card;
+  // Karten in der festen Anfangsphase haengen nicht an der Zielretention -
+  // ihr Abstand steht in EARLY_STEPS. Sie umzurechnen wuerde die Leiter
+  // ueberspringen und die Karte mitten in der Einarbeitung weit wegschieben.
+  const stufe = Number.isFinite(card.earlyStep) ? card.earlyStep : (card.totalReviews || 0);
+  if (stufe < EARLY_COUNT) return card;
 
   const c = { ...card };
   if (c.stability == null) {
@@ -217,6 +239,9 @@ function baseCard() {
     id: uid(),
     ease: 2.5, interval: 0, repetitions: 0, dueDate: todayISO(),
     stability: null, difficulty: null,
+    // Stufe auf der festen Anfangsleiter (EARLY_STEPS). Bestandskarten ohne
+    // dieses Feld leiten ihre Stufe aus totalReviews ab - siehe rate().
+    earlyStep: 0,
     createdAt: todayISO(), lastReviewed: null, totalReviews: 0, correct: 0, wrong: 0,
   };
 }
