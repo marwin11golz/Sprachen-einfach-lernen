@@ -202,7 +202,19 @@ export default function VokabelTrainer() {
   const [queue, setQueue] = useState([]);
   const [sessionTotal, setSessionTotal] = useState(0);
   const [current, setCurrent] = useState(null);
+  // Zwei getrennte Dinge, die frueher ein einziger Schalter waren:
+  //
+  //   revealed         - die Antwort ist heraus. Einwegschalter je Karte: ab
+  //                      hier stehen die Bewertungsknoepfe, und im Tippmodus
+  //                      kommt das Eingabefeld nicht zurueck.
+  //   zeigtRueckseite  - welche Seite gerade oben liegt. Frei umschaltbar,
+  //                      so oft man will.
+  //
+  // Zusammengelegt hiess das: einmal aufgedeckt, und die Frage war fuer immer
+  // weg. Wer nach dem Aufdecken noch einmal auf das spanische Wort schauen
+  // wollte, musste die Karte durchbewerten und auf die naechste Runde warten.
   const [revealed, setRevealed] = useState(false);
+  const [zeigtRueckseite, setZeigtRueckseite] = useState(false);
   const [writeInput, setWriteInput] = useState('');
   const [writeResult, setWriteResult] = useState(null);
 
@@ -404,7 +416,8 @@ export default function VokabelTrainer() {
   useEffect(() => {
     if (view === 'study' && !current && queue.length > 0) {
       setCurrent(queue[0]);
-      setRevealed(false); setWriteInput(''); setWriteResult(null);
+      setRevealed(false); setZeigtRueckseite(false);
+      setWriteInput(''); setWriteResult(null);
     }
     if (view === 'study' && queue.length === 0 && current) setCurrent(null);
   }, [queue, view, current]);
@@ -459,18 +472,31 @@ export default function VokabelTrainer() {
     const ok = dist <= tolerance;
     setWriteResult({ ok, dist });
     setRevealed(true);
+    setZeigtRueckseite(true);
   };
 
   const isWriteInteraction = current && (current.type === 'gap' || studyMode === 'write');
-  // Nur im Aufdeck-Modus laesst sich die Karte antippen; wo getippt wird, deckt
-  // erst das Pruefen auf, sonst waere die Eingabe umgehbar.
-  const canTapToReveal = current && !isWriteInteraction && !revealed;
+  // Die Karte laesst sich antippen, sobald die Eingabe nicht mehr umgangen
+  // werden kann: im Aufdeck-Modus immer, im Tippmodus erst nach dem Pruefen.
+  const kannDrehen = current && (revealed || !isWriteInteraction);
+
+  // Erstes Antippen deckt auf, jedes weitere dreht nur noch die Karte. Beides
+  // liegt auf derselben Geste, weil es fuer den Lernenden dieselbe Bewegung
+  // ist - die Karte umdrehen.
+  const dreheKarte = () => {
+    if (!revealed) { setRevealed(true); setZeigtRueckseite(true); }
+    else setZeigtRueckseite(s => !s);
+  };
 
   // Tastatursteuerung
   useEffect(() => {
     if (view !== 'study') return;
     const handler = (e) => {
-      if (!isWriteInteraction && !revealed && e.code === 'Space') { e.preventDefault(); setRevealed(true); }
+      // Solange das Eingabefeld steht, gehoert die Leertaste dorthin.
+      if (e.code === 'Space' && (revealed || !isWriteInteraction)) {
+        e.preventDefault();
+        dreheKarte();
+      }
       if (revealed && ['1', '2', '3', '4'].includes(e.key)) {
         const map = { '1': 'again', '2': 'hard', '3': 'good', '4': 'easy' };
         submitRating(map[e.key]);
@@ -720,24 +746,33 @@ export default function VokabelTrainer() {
               justifyContent: 'center',
             }}>
               <div
-                key={current.id + String(revealed)}
+                key={current.id + String(zeigtRueckseite)}
                 className="card-in"
-                onClick={canTapToReveal ? () => setRevealed(true) : undefined}
-                role={canTapToReveal ? 'button' : undefined}
-                tabIndex={canTapToReveal ? 0 : undefined}
-                onKeyDown={canTapToReveal
-                  ? e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setRevealed(true); } }
+                onClick={kannDrehen ? dreheKarte : undefined}
+                role={kannDrehen ? 'button' : undefined}
+                tabIndex={kannDrehen ? 0 : undefined}
+                aria-label={kannDrehen
+                  ? (revealed ? 'Karte umdrehen' : 'Karte aufdecken')
+                  : undefined}
+                onKeyDown={kannDrehen
+                  ? e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); dreheKarte(); } }
                   : undefined}
                 style={{
                   ...surface(T), width: '100%', maxWidth: 520, flexShrink: 0,
                   textAlign: 'center', padding: `${SPACE.xxl}px ${SPACE.xl}px`,
-                  cursor: canTapToReveal ? 'pointer' : 'default',
+                  cursor: kannDrehen ? 'pointer' : 'default',
                   backgroundImage: `linear-gradient(155deg, ${T.primarySoft}, ${T.surfaceElevated} 55%)`,
                 }}>
+                {/* Sobald die Karte aufgedeckt ist, sagt das Drehsymbol neben der
+                    Sprache, dass sie sich weiter umdrehen laesst. Vorher waere es
+                    ein Versprechen, das die Karte noch nicht einloest. Gilt auch
+                    fuer Lueckensaetze: dort wechselt das Drehen zwischen
+                    aufgedeckter und wieder verdeckter Luecke. */}
                 <div style={chipStyle}>
+                  {revealed && <Repeat size={11} />}
                   {current.type === 'gap'
                     ? `Satz · ${current.language}`
-                    : (revealed
+                    : (zeigtRueckseite
                         ? (flipped ? current.langA : current.langB)
                         : `${flipped ? current.langB : current.langA} → ${flipped ? current.langA : current.langB}`)}
                 </div>
@@ -755,7 +790,7 @@ export default function VokabelTrainer() {
                 )}
 
                 <div style={{ ...(current.type === 'gap' ? typoH2() : typoDisplay()), marginTop: SPACE.lg }}>
-                  {revealed
+                  {zeigtRueckseite
                     ? (current.type === 'gap' ? revealSentence(current.sentence) : displayBack)
                     : displayFront}
                 </div>
@@ -765,10 +800,10 @@ export default function VokabelTrainer() {
                     <button className="press"
                       onClick={e => {
                         e.stopPropagation();
-                        if (current.type === 'gap') speak(revealSentence(current.sentence), revealed ? backLang : frontLang);
-                        else speak(revealed ? displayBack : displayFront, revealed ? backLang : frontLang);
+                        if (current.type === 'gap') speak(revealSentence(current.sentence), zeigtRueckseite ? backLang : frontLang);
+                        else speak(zeigtRueckseite ? displayBack : displayFront, zeigtRueckseite ? backLang : frontLang);
                       }}
-                      aria-label={revealed ? `Antwort vorlesen (${backLang})` : `Vorlesen (${frontLang})`}
+                      aria-label={zeigtRueckseite ? `Antwort vorlesen (${backLang})` : `Vorlesen (${frontLang})`}
                       style={roundIconBtn}>
                       <Volume2 size={19} />
                     </button>
@@ -776,10 +811,10 @@ export default function VokabelTrainer() {
                 )}
 
                 {/* Jede Seite zeigt den Satz ihrer eigenen Sprache. */}
-                {(revealed ? backExample : frontExample) && (
+                {(zeigtRueckseite ? backExample : frontExample) && (
                   <div style={{ marginTop: SPACE.lg, paddingTop: SPACE.lg, ...divider(T) }}>
                     <div style={{ ...typoBody('lg'), color: T.textSecondary }}>
-                      {revealed ? backExample : frontExample}
+                      {zeigtRueckseite ? backExample : frontExample}
                     </div>
                   </div>
                 )}
@@ -805,12 +840,17 @@ export default function VokabelTrainer() {
                 {!revealed ? (
                   <>
                     {/* Aufgedeckt wird durch Antippen der Karte - ein eigener Knopf
-                        daneben waere derselbe Befehl ein zweites Mal. */}
+                        daneben waere derselbe Befehl ein zweites Mal.
+                        "Richtung" heisst hier bewusst nicht mehr "Umdrehen": es
+                        dreht den ganzen Stapel (Spanisch→Deutsch statt umgekehrt)
+                        und bleibt ueber Karten hinweg stehen, waehrend das
+                        Umdrehen der Karte nur diese eine Karte betrifft. Zwei
+                        Dinge, die dasselbe Wort trugen. */}
                     <div style={{ display: 'flex', justifyContent: 'center', gap: SPACE.lg }}>
                       {current.type === 'vocab' && (
                         <>
                           <button className="press" onClick={() => setFlipped(f => !f)} style={btnGhost(T)}>
-                            <Repeat size={13} /> Umdrehen
+                            <Repeat size={13} /> Richtung
                           </button>
                           <button className="press" onClick={() => setStudyMode(m => m === 'classic' ? 'write' : 'classic')} style={btnGhost(T)}>
                             {studyMode === 'classic' ? 'Tippen' : 'Aufdecken'}
