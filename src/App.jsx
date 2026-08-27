@@ -29,6 +29,22 @@ import SyncBadge from './ui/SyncBadge.jsx';
 // Das Praefix kann mit keinem Sprachpaar kollidieren.
 const DECK_FEHLER = '__fehlerkartei';
 
+// Ab wie vielen erfolgreichen Bewertungen IN FOLGE seit dem letzten "Nochmal"
+// eine einmal falsche Karte als erholt gilt und aus der Fehlerkartei faellt.
+// `wrong` selbst zaehlt bewusst nie zurueck (Lernfortschritt soll nicht
+// schrumpfen) - wuerde die Mitgliedschaft allein an `wrong > 0` haengen, waechst
+// der Stapel nur noch, ganz gleich wie oft eine Karte seither richtig war. Bei
+// laengerer Nutzung stuenden dort irgendwann hunderte laengst sitzende Karten,
+// und "wiederholen" waere witzlos.
+//
+// `earlyStep` zaehlt bereits genau das Richtige mit: aufeinanderfolgende
+// erfolgreiche Bewertungen seit dem letzten Fehler, zurueckgesetzt auf 0 bei
+// jedem "Nochmal" (siehe rate() in srs.js) - ein zweites Feld dafuer waere
+// dieselbe Information doppelt. Zaehlt mit, unabhaengig von der Staerke der
+// Bewertung: auch eine Reihe aus "Schwer" ist erfolgreiches Erinnern, nur ein
+// muehsameres.
+const FEHLERKARTEI_ERHOLT = 3;
+
 // Eine Stapelzeile: Name, Kartenzahl, Lernstand, Hauptaktion - in dieser
 // Rangfolge. Kartenboxen und Fehlerkartei teilen sie sich, damit die
 // Fehlerkartei sich wie ein Stapel anfuehlt und nicht wie ein Sonderfall.
@@ -356,10 +372,9 @@ export default function VokabelTrainer() {
   const wochenSumme = useMemo(() => wochen.reduce((s, w) => s + w.count, 0), [wochen]);
 
   // Die Fehlerkartei ist ein Stapel wie jeder andere: sie sammelt automatisch,
-  // was schon einmal falsch war. Wer hineinkommt, entscheidet unveraendert
-  // `wrong > 0` - nur gezaehlt wird jetzt der ganze Stapel statt einer Auswahl,
-  // denn eine Kartenzahl von "5" waere schlicht falsch.
-  const isDifficult = (c) => (c.wrong || 0) > 0;
+  // was schon einmal falsch war - und laesst wieder los, was sich seitdem
+  // erholt hat (siehe FEHLERKARTEI_ERHOLT oben).
+  const isDifficult = (c) => (c.wrong || 0) > 0 && (c.earlyStep ?? 0) < FEHLERKARTEI_ERHOLT;
   const difficultDeck = useMemo(() => {
     const list = cards.filter(isDifficult)
       .sort((a, b) => (b.wrong / (b.totalReviews || 1)) - (a.wrong / (a.totalReviews || 1)));
