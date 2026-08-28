@@ -23,6 +23,7 @@ import { useAuth } from './hooks/useAuth.js';
 import { useCloudSync } from './hooks/useCloudSync.js';
 import AuthScreen from './ui/AuthScreen.jsx';
 import SyncBadge from './ui/SyncBadge.jsx';
+import SessionDone from './ui/SessionDone.jsx';
 
 // Kennung des Fehlerkartei-Stapels. Kein echter Deck-Schluessel aus deckKeyOf,
 // sondern eine eigene Marke - der Stapel schneidet quer durch alle Sprachpaare.
@@ -217,6 +218,14 @@ export default function VokabelTrainer() {
   const [deckLabel, setDeckLabel] = useState(null);
   const [queue, setQueue] = useState([]);
   const [sessionTotal, setSessionTotal] = useState(0);
+  // Bewertungen DIESER Sitzung, fuer die Trefferquote auf dem
+  // Abschlussbildschirm. Bewusst nicht aus den Karten abgeleitet: dort stehen
+  // die Zaehler ueber die ganze Lebensdauer, und "85 % in dieser Sitzung" ist
+  // etwas anderes als "85 % seit es diese Karte gibt".
+  const [sessionRatings, setSessionRatings] = useState({ richtig: 0, gesamt: 0 });
+  // Ob die Serie durch DIESE Sitzung weitergegangen ist - beim Start gemerkt,
+  // weil danach schon die eigene Aktivitaet mitzaehlt.
+  const [streakNeu, setStreakNeu] = useState(false);
   const [current, setCurrent] = useState(null);
   // Zwei getrennte Dinge, die frueher ein einziger Schalter waren:
   //
@@ -425,6 +434,10 @@ export default function VokabelTrainer() {
     setDeckFilter(key); setDeckLabel(label || null);
     setQueue([...pool].sort(() => Math.random() - 0.5));
     setSessionTotal(pool.length);
+    setSessionRatings({ richtig: 0, gesamt: 0 });
+    // Vor der ersten Bewertung gemerkt: war heute noch nichts, dann traegt
+    // diese Sitzung die Serie weiter, und der Abschluss darf das feiern.
+    setStreakNeu(reviewsToday === 0);
     setCurrent(null);
     setView('study');
   };
@@ -443,6 +456,10 @@ export default function VokabelTrainer() {
     // Momentaufnahme aus der Warteschlange, und zaehlt den Lerntag mit.
     const updated = rateCard(current.id, ratingKey);
     if (!updated) { setCurrent(null); return; }
+    setSessionRatings(p => ({
+      richtig: p.richtig + (ratingKey === 'again' ? 0 : 1),
+      gesamt: p.gesamt + 1,
+    }));
     let rest = queue.slice(1);
     // Zurueck in die Warteschlange kommt, was heute noch einmal drankommen
     // soll: eine vergessene Karte, und der Zehn-Minuten-Schritt der festen
@@ -673,8 +690,33 @@ export default function VokabelTrainer() {
     .card-in { animation: cardIn .22s ease-out; }
     @keyframes riseIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
     .rise-in { animation: riseIn .2s ease-out; }
+
+    /* Abschluss einer Lernsitzung (siehe ui/SessionDone.jsx). Alles laeuft
+       ueber animation-delay gestaffelt ein; "backwards" haelt die Elemente
+       waehrend ihrer Wartezeit im Anfangszustand, ohne dass sie einen
+       versteckten Grundzustand brauchen - faellt die Animation weg
+       (Bewegung reduzieren), stehen sie schlicht fertig da.
+       Die Kurve mit Ueberschwingen ist der back-ease aus dem Entwurf. */
+    @keyframes dcScreen { from { opacity: 0; transform: scale(.94) translateY(24px); } to { opacity: 1; transform: none; } }
+    @keyframes dcCheck  { from { opacity: 0; transform: scale(.5); } to { opacity: 1; transform: scale(1); } }
+    @keyframes dcRise   { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+    @keyframes dcPop    { 0% { transform: scale(1); } 45% { transform: scale(1.32); } 100% { transform: scale(1); } }
+    @keyframes dcGlow   { from { opacity: .5; transform: scale(.6); } to { opacity: 0; transform: scale(1.9); } }
+    .dc-screen { animation: dcScreen .5s cubic-bezier(.34,1.4,.64,1) backwards; }
+    .dc-check  { animation: dcCheck .55s cubic-bezier(.34,1.56,.64,1) backwards; }
+    .dc-rise   { animation: dcRise .5s cubic-bezier(.33,1,.68,1) backwards; }
+    .dc-pop    { animation: dcPop .5s ease-out backwards; }
+    /* "both", nicht "backwards": der Ring soll nach dem Auslaufen
+       verschwunden BLEIBEN. Mit "backwards" faellt er am Ende auf seinen
+       normalen Stil zurueck - und der ist voll sichtbar. */
+    .dc-glow   { animation: dcGlow 1.1s ease-out both; }
+
     @media (prefers-reduced-motion: reduce) {
       .card-in, .rise-in { animation: none; }
+      /* Ohne Bewegung zaehlen auch die Zahlen nicht hoch - das erledigt
+         useHochzaehlen in SessionDone.jsx selbst. */
+      .dc-screen, .dc-check, .dc-rise, .dc-pop { animation: none; }
+      .dc-glow { display: none; }
       .press:active { transform: none; }
     }
 
@@ -741,19 +783,17 @@ export default function VokabelTrainer() {
         </div>
 
         {!current ? (
-          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: SPACE.xl, textAlign: 'center' }}>
-            <div style={{
-              width: 84, height: 84, borderRadius: RADIUS.pill, background: T.successSoft,
-              display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: SPACE.lg,
-            }}>
-              <CheckCircle2 size={42} color={T.success} />
-            </div>
-            <div style={{ ...typoH1(), marginBottom: SPACE.sm }}>Geschafft</div>
-            <div style={{ color: T.textSecondary, marginBottom: SPACE.xl, maxWidth: 320, ...typoBody() }}>
-              {sessionTotal} Karte{sessionTotal !== 1 ? 'n' : ''}{deckLabel ? ` in „${deckLabel}“` : ''} für heute erledigt.
-            </div>
-            <button className="press" onClick={() => setView('dashboard')} style={btnPrimary(T, 'lg')}>Zum Dashboard</button>
-          </div>
+          <SessionDone
+            T={T}
+            sessionTotal={sessionTotal}
+            deckLabel={deckLabel}
+            trefferquote={sessionRatings.gesamt > 0
+              ? Math.round((sessionRatings.richtig / sessionRatings.gesamt) * 100)
+              : 0}
+            streak={streak}
+            streakNeu={streakNeu}
+            onDone={() => setView('dashboard')}
+          />
         ) : (
           <>
             {/* Eine Karte, die umblaettert: vorne die Frage mit dem Satz ihrer
