@@ -123,7 +123,7 @@ function WochenDiagramm({ T, wochen }) {
             <div key={w.ab} title={`Woche ab ${w.ab}: ${w.count} Wiederholungen`}
               style={{ flex: 1, height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', alignItems: 'center' }}>
               {w === spitze && w.count > 0 && (
-                <div className="mono" style={{ fontSize: FONT.xs, color: T.textMuted, lineHeight: 1, marginBottom: SPACE.xs }}>{w.count}</div>
+                <div className="nums" style={{ fontSize: FONT.xs, color: T.textMuted, lineHeight: 1, marginBottom: SPACE.xs }}>{w.count}</div>
               )}
               <div style={{
                 width: '100%', maxWidth: 24,
@@ -648,7 +648,12 @@ export default function VokabelTrainer() {
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
     * { box-sizing: border-box; }
     body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Inter, sans-serif; }
-    .mono { font-family: 'IBM Plex Mono', monospace; font-variant-numeric: tabular-nums; }
+    /* Fuer Kennzahlen bewusst NICHT IBM Plex Mono: deren Null traegt einen
+       fest ins Zeichen eingebackenen Punkt in der Mitte (kein Schrift-Feature
+       schaltet ihn ab, das ist die einzige Form, die die Schrift hat) - bei
+       "0 Karten fällig" faellt das staendig ins Auge. Inter zeigt eine
+       schlichte Null, tabular-nums haelt die Ziffern trotzdem spaltenbuendig. */
+    .nums { font-family: 'Inter', sans-serif; font-variant-numeric: tabular-nums; }
     button { font-family: inherit; }
     ::selection { background: ${T.primarySoft}; }
     input, textarea, select { font-family: inherit; }
@@ -1007,7 +1012,7 @@ export default function VokabelTrainer() {
               <div style={{ display: 'flex', alignItems: 'center', gap: SPACE.xl, marginBottom: SPACE.xl }}>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ display: 'flex', alignItems: 'baseline', gap: SPACE.sm }}>
-                    <span className="mono" style={{ ...typoNumber('hero'), color: dueCards.length > 0 ? T.primary : T.textSecondary }}>
+                    <span className="nums" style={{ ...typoNumber('hero'), color: dueCards.length > 0 ? T.primary : T.textSecondary }}>
                       {dueCards.length}
                     </span>
                     <span style={{ ...typoSecondary(), color: T.textSecondary }}>
@@ -1052,7 +1057,7 @@ export default function VokabelTrainer() {
                 <div key={label} style={{ flex: 1, minWidth: 90 }}>
                   <div style={{ ...typoCaption(), color: T.textSecondary, marginBottom: SPACE.xs }}>{label}</div>
                   <div style={{ display: 'flex', alignItems: 'baseline', gap: SPACE.xs }}>
-                    <span className="mono" style={{ ...typoNumber(), color: farbe }}>{wert}</span>
+                    <span className="nums" style={{ ...typoNumber(), color: farbe }}>{wert}</span>
                     <span style={{ ...typoCaption(), color: T.textMuted }}>{einheit}</span>
                   </div>
                 </div>
@@ -1122,7 +1127,7 @@ export default function VokabelTrainer() {
             <div>
               <div style={{ ...typoH2(), marginBottom: SPACE.md }}>Aktivität</div>
               <div style={{ display: 'flex', alignItems: 'baseline', gap: SPACE.sm, marginBottom: SPACE.xs }}>
-                <span className="mono" style={{ ...typoNumber(), color: T.primary }}>{wochenSumme}</span>
+                <span className="nums" style={{ ...typoNumber(), color: T.primary }}>{wochenSumme}</span>
                 <span style={{ ...typoCaption(), color: T.textSecondary }}>Wiederholungen</span>
               </div>
               <div style={{ fontSize: FONT.xs, color: T.textMuted, marginBottom: SPACE.lg }}>in den letzten 12 Wochen</div>
@@ -1257,7 +1262,7 @@ export default function VokabelTrainer() {
                     ) : (
                       <div style={{ ...typoSecondary() }}>{cardSides(c).front.answer} <span style={{ ...typoBody(), color: T.textSecondary }}>→</span> {cardSides(c).back.answer}</div>
                     )}
-                    <div className="mono" style={{ fontSize: FONT.xs, color: T.textMuted, marginTop: 3 }}>
+                    <div className="nums" style={{ fontSize: FONT.xs, color: T.textMuted, marginTop: 3 }}>
                       {c.type === 'gap' ? `Satz · ${c.language}` : `${c.langA} → ${c.langB}`} · fällig {c.dueDate} · {c.totalReviews || 0}×
                     </div>
                   </div>
