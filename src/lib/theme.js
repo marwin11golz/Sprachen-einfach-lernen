@@ -21,7 +21,11 @@ export function hexToRgba(hex, alpha) {
 // reichten die bis 32 laufenden Stufen nicht aus.
 export const SPACE = { xs: 4, sm: 8, md: 12, lg: 16, xl: 24, xxl: 32, xxxl: 48 };
 export const RADIUS = { sm: 6, md: 8, lg: 12, pill: 999 };
-export const FONT = { xs: 11, sm: 12, base: 13, md: 14, lg: 16, xl: 18, xxl: 22, hero: 32 };
+// "display" steht ueber "hero" und gehoert dem Abschlussbildschirm: dort sind
+// die drei Kennzahlen der Inhalt der Seite, nicht Beiwerk zu einem Text. Eine
+// eigene Stufe statt einer Zahl im Bauteil - sonst waere die Skala nach oben
+// offen und jeder naechste Sonderfall braechte seine eigene Groesse mit.
+export const FONT = { xs: 11, sm: 12, base: 13, md: 14, lg: 16, xl: 18, xxl: 22, hero: 32, display: 44 };
 
 // Platzbedarf der schwebenden unteren Navigation (Pillenhoehe + Abstand zum
 // Bildschirmrand). Der Inhalt braucht unten genau so viel Luft, damit die
