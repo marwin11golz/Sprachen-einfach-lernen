@@ -16,44 +16,12 @@
 // Flamme; die beiden anderen Zahlen stehen in der normalen Textfarbe, damit die
 // Zeilen eine Rangfolge behalten.
 
-import React, { useState, useEffect, useRef } from 'react';
+import React from 'react';
 import { Check, Flame } from 'lucide-react';
 import {
   SPACE, RADIUS, FONT, btnPrimary, typoBody, hexToRgba,
 } from '../lib/theme.js';
-
-// Wer "Bewegung reduzieren" eingestellt hat, bekommt den Endzustand sofort -
-// ohne Einlaufen und ohne hochzaehlende Zahlen. Die Abfrage laeuft einmal beim
-// Aufbau; sie aendert sich waehrend einer Sitzung praktisch nie, und ein
-// Listener dafuer waere mehr Apparat als Nutzen.
-function magKeineBewegung() {
-  return typeof window !== 'undefined'
-    && window.matchMedia
-    && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-}
-
-// Zaehlt von 0 auf ziel. Die Kurve ist dieselbe wie im Entwurf (kubisch
-// auslaufend): schnell los, sanft ankommen - so steht die Zahl am Ende ruhig,
-// statt bis zur letzten Millisekunde zu flackern.
-function useHochzaehlen(ziel, verzoegerungMs, dauerMs = 800) {
-  const ruhig = magKeineBewegung();
-  const [wert, setWert] = useState(ruhig ? ziel : 0);
-  const rafRef = useRef(0);
-
-  useEffect(() => {
-    if (ruhig) { setWert(ziel); return undefined; }
-    const start = performance.now() + verzoegerungMs;
-    const schritt = (jetzt) => {
-      const p = Math.max(0, Math.min(1, (jetzt - start) / dauerMs));
-      setWert(Math.round(ziel * (1 - Math.pow(1 - p, 3))));
-      if (p < 1) rafRef.current = requestAnimationFrame(schritt);
-    };
-    rafRef.current = requestAnimationFrame(schritt);
-    return () => cancelAnimationFrame(rafRef.current);
-  }, [ziel, verzoegerungMs, dauerMs, ruhig]);
-
-  return wert;
-}
+import { useHochzaehlen } from '../lib/motion.js';
 
 // Eine Kennzahlzeile: Zahl gross, Beschriftung klein daneben - beide auf
 // derselben Grundlinie, damit die drei Zeilen untereinander nicht wackeln.

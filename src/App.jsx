@@ -24,6 +24,7 @@ import { useCloudSync } from './hooks/useCloudSync.js';
 import AuthScreen from './ui/AuthScreen.jsx';
 import SyncBadge from './ui/SyncBadge.jsx';
 import SessionDone from './ui/SessionDone.jsx';
+import StreakCelebration from './ui/StreakCelebration.jsx';
 
 // Kennung des Fehlerkartei-Stapels. Kein echter Deck-Schluessel aus deckKeyOf,
 // sondern eine eigene Marke - der Stapel schneidet quer durch alle Sprachpaare.
@@ -226,6 +227,11 @@ export default function VokabelTrainer() {
   // Ob die Serie durch DIESE Sitzung weitergegangen ist - beim Start gemerkt,
   // weil danach schon die eigene Aktivitaet mitzaehlt.
   const [streakNeu, setStreakNeu] = useState(false);
+  // Nach SessionDone kommt die grosse Streak-Feier nur, wenn streakNeu gilt -
+  // sonst geht es direkt zum Dashboard. Eigener Schalter statt streakNeu
+  // direkt zu lesen: SessionDone ist trotzdem IMMER der erste Bildschirm,
+  // auch an einem Streak-Tag - die Feier folgt erst auf "Zur Übersicht".
+  const [zeigeStreakFeier, setZeigeStreakFeier] = useState(false);
   const [current, setCurrent] = useState(null);
   // Zwei getrennte Dinge, die frueher ein einziger Schalter waren:
   //
@@ -438,6 +444,7 @@ export default function VokabelTrainer() {
     // Vor der ersten Bewertung gemerkt: war heute noch nichts, dann traegt
     // diese Sitzung die Serie weiter, und der Abschluss darf das feiern.
     setStreakNeu(reviewsToday === 0);
+    setZeigeStreakFeier(false);
     setCurrent(null);
     setView('study');
   };
@@ -783,16 +790,23 @@ export default function VokabelTrainer() {
         </div>
 
         {!current ? (
-          <SessionDone
-            T={T}
-            sessionTotal={sessionTotal}
-            trefferquote={sessionRatings.gesamt > 0
-              ? Math.round((sessionRatings.richtig / sessionRatings.gesamt) * 100)
-              : 0}
-            streak={streak}
-            streakNeu={streakNeu}
-            onDone={() => setView('dashboard')}
-          />
+          zeigeStreakFeier ? (
+            <StreakCelebration T={T} days={streak} onDone={() => setView('dashboard')} />
+          ) : (
+            <SessionDone
+              T={T}
+              sessionTotal={sessionTotal}
+              trefferquote={sessionRatings.gesamt > 0
+                ? Math.round((sessionRatings.richtig / sessionRatings.gesamt) * 100)
+                : 0}
+              streak={streak}
+              streakNeu={streakNeu}
+              // An einem Streak-Tag geht es nicht direkt zum Dashboard,
+              // sondern erst zur grossen Feier - SessionDone bleibt trotzdem
+              // fuer jede Sitzung der erste Bildschirm.
+              onDone={() => (streakNeu ? setZeigeStreakFeier(true) : setView('dashboard'))}
+            />
+          )
         ) : (
           <>
             {/* Eine Karte, die umblaettert: vorne die Frage mit dem Satz ihrer
