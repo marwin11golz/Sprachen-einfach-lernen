@@ -56,11 +56,23 @@ export default function StreakCelebration({ T, days, onDone }) {
         position: 'relative', width: 200, height: 160,
         display: 'flex', alignItems: 'center', justifyContent: 'center',
       }}>
+        {/* Im Entwurf ein sehr blasser Ring (1px, Farbe selbst schon halb
+            durchsichtig, dazu eine Deckkraft, die auf 0,35 gedeckelt ist) -
+            kaum mehr als ein Hauch. Eine volltonige Linie in Bauteilfarbe war
+            hier zu kraeftig und sah aus wie ein gezeichneter Kreis statt wie
+            ein Lichtschein. hexToRgba nimmt die Deckkraft vorweg. */}
         <span className="dc-glow" style={{
           position: 'absolute', width: 150, height: 150, borderRadius: RADIUS.pill,
-          border: `1px solid ${T.primary}`, animationDelay: '150ms',
+          border: `1px solid ${hexToRgba(T.primary, .55)}`, animationDelay: '150ms',
         }} />
-        <span className="dc-pop" style={{ display: 'inline-flex', animationDelay: '200ms' }}>
+        {/* Der eigentliche Glanz im Entwurf sitzt nicht im Ring, sondern als
+            weicher Schlagschatten auf der Flamme selbst
+            (filter: drop-shadow(...)) - ohne ihn blieb nur der Ring uebrig,
+            und der allein wirkte wie ein Fremdkoerper um das Symbol. */}
+        <span className="dc-pop" style={{
+          display: 'inline-flex', animationDelay: '200ms',
+          filter: `drop-shadow(0 0 22px ${hexToRgba(T.primary, .4)})`,
+        }}>
           <Flame size={92} color={T.primary} strokeWidth={1.6} />
         </span>
       </div>

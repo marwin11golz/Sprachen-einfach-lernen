@@ -40,14 +40,17 @@ function Kennzahl({ T, wert, einheit, farbe, verzoegerung, icon, hervor }) {
           alignSelf: 'center',
         }}>
           {hervor && (
+            // Blasser Ring statt volltoniger Linie - dieselbe Korrektur wie in
+            // StreakCelebration.jsx, dort ausfuehrlicher begruendet.
             <span className="dc-glow" style={{
               position: 'absolute', width: 30, height: 30, borderRadius: RADIUS.pill,
-              border: `1px solid ${T.primary}`,
+              border: `1px solid ${hexToRgba(T.primary, .55)}`,
               animationDelay: `${verzoegerung + 150}ms`,
             }} />
           )}
           <span className="dc-pop" style={{
             display: 'inline-flex', animationDelay: `${verzoegerung + 200}ms`,
+            filter: hervor ? `drop-shadow(0 0 8px ${hexToRgba(T.primary, .4)})` : undefined,
           }}>
             {icon}
           </span>
