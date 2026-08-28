@@ -786,7 +786,6 @@ export default function VokabelTrainer() {
           <SessionDone
             T={T}
             sessionTotal={sessionTotal}
-            deckLabel={deckLabel}
             trefferquote={sessionRatings.gesamt > 0
               ? Math.round((sessionRatings.richtig / sessionRatings.gesamt) * 100)
               : 0}
