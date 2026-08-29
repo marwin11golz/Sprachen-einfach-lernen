@@ -1243,13 +1243,15 @@ export default function VokabelTrainer() {
             <div className="nav-top-links">
               {navItems.map(([key, label, Icon]) => (
                 <button key={key} className="press" onClick={() => setView(key)}
+                  title={key === 'settings' ? 'Einstellungen' : undefined}
+                  aria-label={key === 'settings' ? 'Einstellungen' : undefined}
                   style={{
                     display: 'flex', alignItems: 'center', gap: SPACE.xs, padding: `${SPACE.sm}px ${SPACE.md}px`, borderRadius: RADIUS.pill,
                     border: 'none', cursor: 'pointer', ...typoSecondary(),
                     background: view === key ? T.primarySoft : 'transparent',
                     color: view === key ? T.primary : T.textSecondary, transition: 'background .15s, color .15s',
                   }}>
-                  <Icon size={16} /> {label}
+                  <Icon size={16} /> {key !== 'settings' && label}
                 </button>
               ))}
             </div>
@@ -1503,7 +1505,6 @@ export default function VokabelTrainer() {
 
                 <label style={{ ...typoSecondary('sm'), color: T.textSecondary, display: 'block', marginBottom: SPACE.sm }}>Vokabeln</label>
                 <textarea value={addText} onChange={e => setAddText(e.target.value)}
-                  placeholder={'casa = Haus\nperro = Hund | Der Hund schläft.\ncasa | Vivo en una casa. = Haus | Ich wohne in einem Haus.'}
                   rows={8}
                   style={{ ...inputStyle, resize: 'vertical', lineHeight: 1.7, fontFamily: "'IBM Plex Mono', monospace", fontSize: FONT.base }} />
 
@@ -1527,7 +1528,6 @@ export default function VokabelTrainer() {
 
                 <label style={{ ...typoSecondary('sm'), color: T.textSecondary, display: 'block', marginBottom: SPACE.sm }}>Sätze</label>
                 <textarea value={sentenceText} onChange={e => setSentenceText(e.target.value)}
-                  placeholder={'Yo [como] fruta todos los días.\nElla [tiene] veinte años.\nNosotros [vivimos] en Berlín.'}
                   rows={8}
                   style={{ ...inputStyle, resize: 'vertical', lineHeight: 1.7, fontFamily: "'IBM Plex Mono', monospace", fontSize: FONT.base }} />
 
@@ -1747,6 +1747,8 @@ export default function VokabelTrainer() {
             const active = view === key;
             return (
               <button key={key} className="press" onClick={() => setView(key)}
+                title={key === 'settings' ? 'Einstellungen' : undefined}
+                aria-label={key === 'settings' ? 'Einstellungen' : undefined}
                 style={{
                   display: 'flex', alignItems: 'center', gap: SPACE.xs, padding: `${SPACE.sm}px ${SPACE.md}px`,
                   borderRadius: RADIUS.pill, border: 'none', cursor: 'pointer', whiteSpace: 'nowrap',
@@ -1754,7 +1756,7 @@ export default function VokabelTrainer() {
                   color: active ? T.primary : T.textSecondary, ...typoSecondary('sm'),
                   transition: 'background .15s, color .15s',
                 }}>
-                <Icon size={17} strokeWidth={active ? 2.3 : 1.9} /> {label}
+                <Icon size={17} strokeWidth={active ? 2.3 : 1.9} /> {key !== 'settings' && label}
               </button>
             );
           })}
