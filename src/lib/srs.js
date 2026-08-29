@@ -34,6 +34,39 @@ export function daysBetween(fromISO, toISO) {
   return Math.max(0, Math.round((to - from) / 86400000));
 }
 
+const MONATE = ['Jan.', 'Feb.', 'März', 'Apr.', 'Mai', 'Juni', 'Juli', 'Aug.', 'Sep.', 'Okt.', 'Nov.', 'Dez.'];
+
+// Ein Faelligkeitsdatum als Angabe, die man beim Ueberfliegen versteht.
+//
+// In der Kartenliste stand bisher das rohe ISO-Datum ("fällig 2026-08-29").
+// Das muss man gegen das heutige Datum im Kopf verrechnen, um zu wissen, ob
+// eine Karte ansteht - bei einer Liste, die man ueberfliegt, ist das die
+// falsche Arbeit. Nah am heutigen Tag zaehlt der Abstand, weiter weg wird das
+// Datum selbst wieder aussagekraeftiger als "in 143 Tagen".
+//
+// daysBetween() taugt hier nicht: es klemmt bei 0 und koennte "ueberfaellig"
+// gar nicht ausdruecken. Die Tagesgrenze wird aber genauso ueber UTC-Mitternacht
+// gebildet, damit beide Funktionen denselben Tageswechsel sehen.
+export function relativerTag(iso, heuteISO = todayISO()) {
+  const ziel = new Date(`${iso}T00:00:00.000Z`);
+  const heute = new Date(`${heuteISO}T00:00:00.000Z`);
+  if (Number.isNaN(ziel.getTime()) || Number.isNaN(heute.getTime())) return iso;
+  const tage = Math.round((ziel - heute) / 86400000);
+
+  if (tage === 0) return 'heute';
+  if (tage === 1) return 'morgen';
+  if (tage === -1) return 'seit gestern';
+  if (tage < 0) return `seit ${-tage} Tagen`;
+  if (tage <= 13) return `in ${tage} Tagen`;
+  // Ab zwei Wochen das Datum. Das Jahr nur, wenn es ein anderes ist - sonst
+  // traegt jede Zeile vier Ziffern, die immer gleich sind.
+  const tagNr = ziel.getUTCDate();
+  const monat = MONATE[ziel.getUTCMonth()];
+  return ziel.getUTCFullYear() === heute.getUTCFullYear()
+    ? `${tagNr}. ${monat}`
+    : `${tagNr}. ${monat} ${ziel.getUTCFullYear()}`;
+}
+
 // Einmaliges Impfen von stability/difficulty für Karten aus der Zeit vor
 // FSRS: Das zuletzt gewählte Intervall IST bereits eine Schätzung, wie
 // viele Tage die Erinnerung trägt - genau das, was FSRS Stabilität nennt.

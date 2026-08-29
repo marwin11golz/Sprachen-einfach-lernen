@@ -114,6 +114,21 @@ export function useVocabStore() {
     bump();
   }, [bump]);
 
+  // Mehrere Karten in EINEM Durchgang. Ueber deleteCard in einer Schleife
+  // waeren es je Karte ein Zustandsupdate und ein Hochzaehlen der Revision -
+  // bei 200 markierten Karten also 200 Renderzyklen und 200 Anstoesse fuer den
+  // Cloud-Abgleich. Grabsteine wie beim Einzelloeschen: entfernt wird nichts,
+  // sonst holt das andere Geraet die Karten beim naechsten Abgleich zurueck.
+  const deleteCards = useCallback((ids) => {
+    const menge = ids instanceof Set ? ids : new Set(ids);
+    if (menge.size === 0) return;
+    const jetzt = new Date().toISOString();
+    setAllCards(prev => prev.map(c => (
+      menge.has(c.id) ? { ...c, deleted: true, updatedAt: jetzt } : c
+    )));
+    bump();
+  }, [bump]);
+
   const importData = useCallback((parsed) => {
     const incoming = (parsed.cards || []).map(migrateCard);
     setAllCards(prev => mergeCards(prev, incoming));
@@ -153,6 +168,6 @@ export function useVocabStore() {
     prefsUpdatedAt, lastUserId, lastSyncAt,
     loaded, storageWarning,
     revision,
-    addCards, rateCard, deleteCard, importData, applyRemote,
+    addCards, rateCard, deleteCard, deleteCards, importData, applyRemote,
   };
 }

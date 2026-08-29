@@ -17,6 +17,9 @@ function fmtTime(iso) {
 }
 
 export default function AuthScreen({
+  // onBack ist wahlfrei: als eigene Ansicht aufgerufen braucht der Bildschirm
+  // einen Rueckweg, eingebettet in die Einstellungen traegt ihn die Navigation
+  // selbst - dort wuerde ein "Zurück" ins Leere zeigen.
   T, auth, sync, cardCount, onBack,
 }) {
   const [mode, setMode] = useState('signin');
@@ -44,7 +47,7 @@ export default function AuthScreen({
           Die App funktioniert vollständig – deine Vokabeln bleiben aber nur auf
           diesem Gerät.
         </div>
-        <button onClick={onBack} style={{ ...btnSecondary(T), marginTop: 16 }}>Zurück</button>
+        {onBack && <button onClick={onBack} style={{ ...btnSecondary(T), marginTop: 16 }}>Zurück</button>}
       </div>
     );
   }
@@ -91,9 +94,11 @@ export default function AuthScreen({
           >
             <LogOut size={14} style={{ marginRight: 6 }} /> Abmelden
           </button>
-          <button onClick={onBack} style={btnGhost(T)}>
-            Zurück
-          </button>
+          {onBack && (
+            <button onClick={onBack} style={btnGhost(T)}>
+              Zurück
+            </button>
+          )}
         </div>
 
       </div>
@@ -153,11 +158,13 @@ export default function AuthScreen({
         {mode === 'signin' ? 'Noch kein Konto? Konto erstellen' : 'Schon ein Konto? Anmelden'}
       </button>
 
-      <div style={{ marginTop: 6 }}>
-        <button onClick={onBack} style={btnGhost(T)}>
-          Zurück
-        </button>
-      </div>
+      {onBack && (
+        <div style={{ marginTop: 6 }}>
+          <button onClick={onBack} style={btnGhost(T)}>
+            Zurück
+          </button>
+        </div>
+      )}
 
     </div>
   );

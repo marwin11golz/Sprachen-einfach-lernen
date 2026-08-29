@@ -2,11 +2,11 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   Plus, Search, BarChart3, Layers, CheckCircle2, XCircle, Sun, Moon, X,
   Download, Trash2, Volume2, Upload, BookOpen, PenLine, ChevronRight, Repeat,
-  MinusCircle, Star, AlertTriangle,
+  MinusCircle, Star, AlertTriangle, Settings, ArrowUp, ArrowDown, CheckSquare, Square, ChevronLeft,
 } from 'lucide-react';
 
 import {
-  levenshtein, todayISO, cardSides,
+  levenshtein, todayISO, cardSides, relativerTag,
   parseGapLine, revealSentence,
   deckKeyOf, deckLabelOf,
   newVocabCard, newGapCard,
@@ -19,6 +19,7 @@ import {
   typoDisplay, typoH1, typoH2, typoBody, typoSecondary, typoCaption, typoNumber,
 } from './lib/theme.js';
 import { useVocabStore } from './hooks/useVocabStore.js';
+import { useFensterListe } from './hooks/useFensterListe.js';
 import { useAuth } from './hooks/useAuth.js';
 import { useCloudSync } from './hooks/useCloudSync.js';
 import AuthScreen from './ui/AuthScreen.jsx';
@@ -46,6 +47,124 @@ const DECK_FEHLER = '__fehlerkartei';
 // Bewertung: auch eine Reihe aus "Schwer" ist erfolgreiches Erinnern, nur ein
 // muehsameres.
 const FEHLERKARTEI_ERHOLT = 3;
+
+// Zeilenhoehe der Kartenliste in Pixeln. Muss zum tatsaechlichen Layout
+// passen: das Fenster-Rendering (useFensterListe) stellt oben und unten
+// Platzhalter dieser Hoehe je Zeile, und weicht der Wert ab, springt die Liste
+// beim Bildlauf. Deshalb kappen die Zeilen langen Text, statt umzubrechen.
+const ZEILE_H = 44;
+
+// Sortierfelder der Kartenliste. "neu" hat keinen Wert-Ausleser, weil es die
+// Anlagereihenfolge rueckwaerts ist - siehe sortiert().
+//
+// `ab` ist die Richtung, mit der ein Feld ANFAENGT, wenn man es waehlt, und
+// sie ist je Feld verschieden: bei der Faelligkeit will man das Naechste
+// zuerst, bei der Fehlerquote das Schlimmste. Eine einheitliche Vorgabe haette
+// die Fehlerquote verkehrt herum aufgezogen - erst die fehlerfreien Karten,
+// die man am wenigsten sehen muss.
+const SORTIERFELDER = {
+  neu: { label: 'Zuletzt angelegt', ab: false },
+  alpha: { label: 'Alphabet', ab: false, wert: c => ((c.type === 'gap' ? c.sentence : c.front) || '').toLowerCase() },
+  stapel: { label: 'Stapel', ab: false, wert: c => deckLabelOf(c).toLowerCase() },
+  faellig: { label: 'Fälligkeit', ab: false, wert: c => c.dueDate || '' },
+  wdh: { label: 'Wiederholungen', ab: true, wert: c => c.totalReviews || 0 },
+  fehler: {
+    label: 'Fehlerquote',
+    ab: true,
+    // Nie bewertete Karten haben keine Quote. Sie bekommen -1 statt einer
+    // erfundenen 0 - so stehen sie beim absteigenden Sortieren am Ende und
+    // nicht zwischen den fehlerfreien Karten.
+    wert: c => (c.totalReviews > 0 ? (c.wrong || 0) / c.totalReviews : -1),
+  },
+};
+
+// Ein Spaltenkopf der Kartenliste. Klick sortiert, erneuter Klick dreht um.
+function SortKopf({ T, feld, label, sortierung, onSort, style }) {
+  const aktiv = sortierung.feld === feld;
+  return (
+    <button className="press" onClick={() => onSort(feld)}
+      style={{
+        ...style, background: 'none', border: 'none', padding: 0, cursor: 'pointer',
+        display: 'flex', alignItems: 'center', gap: SPACE.xs, textAlign: 'left',
+        font: 'inherit', color: aktiv ? T.textPrimary : 'inherit',
+      }}>
+      {label}
+      {aktiv && (sortierung.ab ? <ArrowUp size={11} /> : <ArrowDown size={11} />)}
+    </button>
+  );
+}
+
+// Eine Zeile der Kartenliste - EINZEILIG, mit fester Hoehe (ZEILE_H).
+//
+// Vorher standen hier zwei Textzeilen je Karte (~72 px): bei einer gewachsenen
+// Kartei passten damit knapp zwoelf Karten auf einen Handy-Bildschirm. Jetzt
+// traegt eine Zeile alles, und die Nebenangaben stehen rechts - am Handy nur
+// die Faelligkeit, am breiten Bildschirm zusaetzlich Stapel und Zaehler in
+// eigenen Spalten.
+//
+// Die feste Hoehe ist Bedingung fuer das Fenster-Rendering: die Platzhalter
+// oben und unten rechnen mit ihr. Deshalb kappt der Text, statt umzubrechen.
+function KartenZeile({ T, card, auswahlModus, markiert, onMarkieren, onLoeschen }) {
+  const seiten = cardSides(card);
+  const titel = card.type === 'gap'
+    ? revealSentence(card.sentence)
+    : `${seiten.front.answer} → ${seiten.back.answer}`;
+  const stapel = card.type === 'gap' ? `Satz · ${card.language}` : `${card.langA} → ${card.langB}`;
+  const ueberfaellig = card.dueDate <= todayISO();
+
+  return (
+    <div
+      className="row-link"
+      onClick={auswahlModus ? onMarkieren : undefined}
+      style={{
+        height: ZEILE_H, boxSizing: 'border-box',
+        padding: `0 ${SPACE.md}px`, borderRadius: RADIUS.md,
+        display: 'flex', alignItems: 'center', gap: SPACE.md,
+        borderBottom: `1px solid ${T.hairline}`,
+        cursor: auswahlModus ? 'pointer' : 'default',
+        background: markiert ? T.primarySoft : undefined,
+      }}>
+      {auswahlModus && (
+        <span style={{ display: 'flex', flexShrink: 0, color: markiert ? T.primary : T.textMuted }}>
+          {markiert ? <CheckSquare size={18} /> : <Square size={18} />}
+        </span>
+      )}
+      <span style={{
+        ...typoSecondary(), flex: 1, minWidth: 0,
+        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+      }}>
+        {titel}
+      </span>
+      {/* Nur am breiten Bildschirm: eigene Spalten fuer Stapel und Zaehler. */}
+      <span className="karten-spalte" style={{
+        width: 150, flexShrink: 0, ...typoCaption(), color: T.textMuted,
+        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+      }}>
+        {stapel}
+      </span>
+      <span className="nums" style={{
+        width: 110, flexShrink: 0, textAlign: 'right', fontSize: FONT.xs,
+        color: ueberfaellig ? T.primary : T.textMuted, whiteSpace: 'nowrap',
+      }}>
+        {relativerTag(card.dueDate)}
+      </span>
+      <span className="karten-spalte nums" style={{
+        width: 90, flexShrink: 0, textAlign: 'right', fontSize: FONT.xs, color: T.textMuted,
+        whiteSpace: 'nowrap',
+      }}>
+        {card.totalReviews > 0 ? `${card.totalReviews} Wdh.` : 'neu'}
+      </span>
+      {!auswahlModus ? (
+        <button className="press" onClick={onLoeschen} aria-label={`Karte löschen: ${titel}`}
+          style={{ background: 'none', border: 'none', cursor: 'pointer', color: T.textSecondary, flexShrink: 0, padding: 4, display: 'flex' }}>
+          <Trash2 size={15} />
+        </button>
+      ) : (
+        <span style={{ width: 28, flexShrink: 0 }} />
+      )}
+    </div>
+  );
+}
 
 // Eine Stapelzeile: Name, Kartenzahl, Lernstand, Hauptaktion - in dieser
 // Rangfolge. Kartenboxen und Fehlerkartei teilen sie sich, damit die
@@ -197,7 +316,7 @@ export default function VokabelTrainer() {
     flipped, setFlipped,
     newCardsPerDay, setNewCardsPerDay,
     loaded, storageWarning,
-    addCards, rateCard, deleteCard, importData,
+    addCards, rateCard, deleteCard, deleteCards, importData,
   } = store;
 
   const auth = useAuth();
@@ -249,9 +368,30 @@ export default function VokabelTrainer() {
   const [writeInput, setWriteInput] = useState('');
   const [writeResult, setWriteResult] = useState(null);
 
+  // search ist der Feldwert und aendert sich bei jedem Tastendruck sofort -
+  // das Eingabefeld darf nie haengen. Gefiltert wird ueber sucheAktiv, das
+  // kurz nachlaeuft: sonst rechnet und zeichnet die App die ganze Liste bei
+  // jedem Buchstaben neu (bei 800 Karten waren das ~90 ms je Anschlag).
   const [search, setSearch] = useState('');
+  const [sucheAktiv, setSucheAktiv] = useState('');
   const [filter, setFilter] = useState('all');
+  // Reihenfolge der Kartenliste. "neu" heisst zuletzt angelegt zuerst - das
+  // war schon vorher die Vorgabe, nur ohne Wahlmoeglichkeit.
+  const [sortierung, setSortierung] = useState({ feld: 'neu', ab: false });
+  // Welcher Stapel in der Kartenverwaltung offen ist. null heisst: die
+  // Uebersicht. Der Zwischenschritt ist der Punkt der Ansicht - alle Vokabeln
+  // auf einmal sind bei einer gewachsenen Kartei nicht zu ueberblicken.
+  const [browseStapel, setBrowseStapel] = useState(null);
+  // IDs der markierten Karten. Set statt Array: die Zeile fragt bei jedem
+  // Zeichnen "bin ich dabei?", und das muss bei tausend Karten billig sein.
+  const [markiert, setMarkiert] = useState(() => new Set());
+  const [auswahlModus, setAuswahlModus] = useState(false);
   const [dashSearch, setDashSearch] = useState('');
+
+  useEffect(() => {
+    const t = setTimeout(() => setSucheAktiv(search), 150);
+    return () => clearTimeout(t);
+  }, [search]);
 
   const T = THEMES[theme];
   const vocabFileRef = useRef(null);
@@ -547,8 +687,11 @@ export default function VokabelTrainer() {
 
   // --- Browse ---
   const filtered = useMemo(() => {
-    let list = cards;
-    const q = search.trim().toLowerCase();
+    // Immer nur der offene Stapel: die Ansicht zeigt nie den ganzen Bestand
+    // auf einmal. Alles Weitere - Sortierung, Fenster-Rendering, Auswahl -
+    // haengt an dieser Liste und bleibt dadurch unveraendert.
+    let list = browseStapel ? cards.filter(c => deckKeyOf(c) === browseStapel) : [];
+    const q = sucheAktiv.trim().toLowerCase();
     if (q) list = list.filter(c => {
       const hay = c.type === 'gap' ? `${c.sentence} ${c.back}` : `${c.front} ${c.back}`;
       return hay.toLowerCase().includes(q);
@@ -558,8 +701,77 @@ export default function VokabelTrainer() {
     if (filter === 'difficult') list = list.filter(c => (c.wrong || 0) > 0);
     if (filter === 'vocab') list = list.filter(c => c.type === 'vocab');
     if (filter === 'gap') list = list.filter(c => c.type === 'gap');
-    return list.slice().reverse();
-  }, [cards, search, filter]);
+    return list;
+  }, [cards, sucheAktiv, filter, browseStapel]);
+
+  // Sortieren steht bewusst in einem EIGENEN Memo hinter dem Filtern: so
+  // laeuft beim Umstellen der Reihenfolge nicht auch noch die Suche neu, und
+  // beim Tippen nicht die Sortierung.
+  const sortiert = useMemo(() => {
+    // "Zuletzt angelegt" ist die Anlagereihenfolge rueckwaerts, nicht eine
+    // Sortierung nach createdAt: das Feld traegt nur den Tag, und wer zwanzig
+    // Vokabeln auf einmal einfuegt, haette sonst zwanzig gleiche Werte und
+    // damit eine willkuerliche Reihenfolge.
+    if (sortierung.feld === 'neu') {
+      const liste = filtered.slice();
+      if (!sortierung.ab) liste.reverse();
+      return liste;
+    }
+    const feld = SORTIERFELDER[sortierung.feld] || SORTIERFELDER.faellig;
+    return filtered.slice().sort((a, b) => {
+      const x = feld.wert(a);
+      const y = feld.wert(b);
+      if (x === y) return 0;
+      return (x < y ? -1 : 1) * (sortierung.ab ? -1 : 1);
+    });
+  }, [filtered, sortierung]);
+
+  // --- Mehrfachauswahl ---
+  // Beim Wechsel von Suche oder Filter faellt die Markierung weg: sonst
+  // loescht "N ausgewählt" auch Karten, die gerade gar nicht zu sehen sind.
+  useEffect(() => { setMarkiert(new Set()); }, [sucheAktiv, filter, browseStapel]);
+
+  // Beim Verlassen der Kartenverwaltung zurueck auf die Uebersicht: wer sie
+  // spaeter wieder oeffnet, soll bei den Stapeln landen und nicht mitten in
+  // einer Vokabelliste, die er laengst vergessen hat.
+  useEffect(() => {
+    if (view !== 'browse') { setBrowseStapel(null); setSearch(''); setAuswahlModus(false); }
+  }, [view]);
+
+  const markierungUmschalten = (id) => {
+    setMarkiert(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+  // "Alle" meint immer die gerade sichtbare Auswahl, nie den ganzen Bestand.
+  const alleSichtbarenMarkiert = sortiert.length > 0 && sortiert.every(c => markiert.has(c.id));
+  const alleUmschalten = () => {
+    setMarkiert(alleSichtbarenMarkiert ? new Set() : new Set(sortiert.map(c => c.id)));
+  };
+  const auswahlBeenden = () => { setMarkiert(new Set()); setAuswahlModus(false); };
+  const markierteLoeschen = () => {
+    const anzahl = markiert.size;
+    if (anzahl === 0) return;
+    // Einmal nachfragen: Loeschen laesst sich in der Oberflaeche nicht
+    // rueckgaengig machen, und hier trifft es viele Karten auf einmal.
+    if (!window.confirm(`${anzahl} ${anzahl === 1 ? 'Karte' : 'Karten'} löschen?`)) return;
+    deleteCards(markiert);
+    showToast(`${anzahl} ${anzahl === 1 ? 'Karte' : 'Karten'} gelöscht.`);
+    auswahlBeenden();
+  };
+
+  // Spaltenkopf am Desktop: erneutes Klicken dreht die Richtung um.
+  // Fenster-Rendering der Kartenliste: gezeichnet wird nur, was gerade
+  // sichtbar ist (siehe useFensterListe). Der Hook liefert seine eigene ref.
+  const fenster = useFensterListe({ laenge: sortiert.length, zeilenHoehe: ZEILE_H });
+
+  const sortierenNach = (feld) => {
+    setSortierung(s => (s.feld === feld
+      ? { feld, ab: !s.ab }
+      : { feld, ab: SORTIERFELDER[feld].ab }));
+  };
 
 
   const [exportText, setExportText] = useState(null);
@@ -739,11 +951,37 @@ export default function VokabelTrainer() {
     .nav-top-links { display: flex; gap: ${SPACE.xs}px; }
     .brand-full { display: inline; }
     .page { max-width: 980px; margin: 0 auto; padding: ${SPACE.xl}px ${SPACE.lg}px ${SPACE.xxl}px; }
+
+    /* Kartenliste: am breiten Bildschirm eine Tabelle mit Spaltenkoepfen, am
+       Handy eine einzeilige Liste. Nach demselben Muster wie die Navigation -
+       die Sichtbarkeit haengt allein an der Medienabfrage, nie an einem
+       inline display. */
+    .karten-kopf { display: flex; }
+    .karten-spalte { display: inline; }
+    /* Breite und Umbruch der Werkzeugleiste stehen NUR hier, nie als inline
+       style: ein inline flex schlaegt die Medienabfrage unten genauso, wie ein
+       inline display die Navigationsregeln schlagen wuerde. Genau daran sind
+       die Auswahlfelder im ersten Anlauf auf 55 px zusammengequetscht. */
+    .karten-suche { flex: 1 1 200px; }
+    .karten-werkzeuge > select { flex: 0 0 auto; width: auto; }
+    /* Am breiten Bildschirm gibt es unten keine Navigation, dort sitzt die
+       Auswahlleiste am Rand. Am Handy muss sie ueber die Pille steigen -
+       sonst liegen beide uebereinander. Auch das gehoert ins CSS: ein inline
+       bottom wuerde die Regel unten schlagen. */
+    .auswahl-leiste { bottom: calc(${SPACE.lg}px + env(safe-area-inset-bottom)); }
+
     @media (max-width: 720px) {
       .hero { flex-direction: column; text-align: center; gap: ${SPACE.lg}px; }
       .hero-actions { width: 100%; }
       .nav-top-links { display: none; }
       .nav-bottom { display: flex; }
+      .karten-kopf { display: none; }
+      .karten-spalte { display: none; }
+      /* Suche allein in die erste Zeile, die beiden Auswahlfelder teilen sich
+         die zweite. Sonst steht das Sortierfeld allein in einer dritten. */
+      .karten-suche { flex-basis: 100%; }
+      .karten-werkzeuge > select { flex: 1 1 0; width: 100%; min-width: 0; }
+      .auswahl-leiste { bottom: calc(${NAVBAR_H + SPACE.lg}px + env(safe-area-inset-bottom)); }
       .brand { font-size: ${FONT.lg}px; }
       /* Nur wenn die Leiste unten wirklich sichtbar ist, muss der Inhalt ihr ausweichen. */
       .page { padding-bottom: calc(${NAVBAR_H + SPACE.xl}px + env(safe-area-inset-bottom)); }
@@ -976,6 +1214,7 @@ export default function VokabelTrainer() {
     ['dashboard', 'Start', BarChart3],
     ['add', 'Hinzufügen', Plus],
     ['browse', 'Karten', Search],
+    ['settings', 'Mehr', Settings],
   ];
 
   return (
@@ -1014,7 +1253,7 @@ export default function VokabelTrainer() {
                 </button>
               ))}
             </div>
-            <SyncBadge T={T} state={sync.syncState} onClick={() => setView('account')} />
+            <SyncBadge T={T} state={sync.syncState} onClick={() => setView('settings')} />
             <button className="press" onClick={() => setTheme(t => t === 'light' ? 'dark' : 'light')}
               aria-label="Design wechseln"
               style={{ padding: 9, borderRadius: RADIUS.pill, border: `1px solid ${T.border}`, background: T.surfaceElevated, cursor: 'pointer', color: T.textPrimary, display: 'flex' }}>
@@ -1047,9 +1286,56 @@ export default function VokabelTrainer() {
           </div>
         )}
 
-        {/* ---------- KONTO ---------- */}
-        {view === 'account' && (
-          <AuthScreen T={T} auth={auth} sync={sync} cardCount={cards.length} onBack={() => setView('dashboard')} />
+        {/* ---------- MEHR ----------
+            Export, Import und Konto - Verwaltung, die vorher die Kartenliste
+            zumuellte (Export/Import in der Werkzeugleiste, das Einspielen
+            einer Sicherung als vierter Block unter den Karten). Das
+            Tageslimit bleibt bewusst auf dem Dashboard: es gehoert zum
+            taeglichen Lernen und wird dort gebraucht, nicht in der
+            Verwaltung. */}
+        {view === 'settings' && (
+          <div style={{ maxWidth: 640, margin: '0 auto' }}>
+            <div style={{ ...typoDisplay(), marginBottom: SPACE.xl }}>Mehr</div>
+
+            <div style={{ marginBottom: SPACE.xxxl }}>
+              <div style={{ ...typoH2(), marginBottom: SPACE.md }}>Daten</div>
+              <div style={{ ...surfaceSoft(T), border: `1px solid ${T.hairline}`, padding: SPACE.lg }}>
+                <div style={{ display: 'flex', gap: SPACE.sm, flexWrap: 'wrap' }}>
+                  <button className="press" onClick={exportJSON} style={btnSecondary(T)}><Download size={15} /> Export</button>
+                  <button className="press" onClick={() => importFileRef.current.click()} style={btnSecondary(T)}><Upload size={15} /> Import</button>
+                  <input ref={importFileRef} type="file" accept=".json" style={{ display: 'none' }} onChange={importJSON} />
+                </div>
+
+                {exportText !== null && (
+                  <div className="rise-in" style={{ marginTop: SPACE.lg }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: SPACE.md }}>
+                      <div style={{ ...typoSecondary() }}>Sicherung</div>
+                      <button className="press" onClick={() => setExportText(null)} style={btnGhost(T, 'sm')}>Schließen</button>
+                    </div>
+                    <textarea ref={exportTextareaRef} readOnly value={exportText} rows={5}
+                      onFocus={e => e.target.select()}
+                      style={{ ...inputStyle, background: T.background, fontSize: FONT.xs, fontFamily: "'IBM Plex Mono', monospace", resize: 'vertical' }} />
+                    <button className="press" onClick={copyExportText} style={{ ...btnPrimary(T), marginTop: SPACE.md }}>Kopieren</button>
+                  </div>
+                )}
+
+                <div style={{ marginTop: SPACE.xl, paddingTop: SPACE.lg, ...divider(T) }}>
+                  <div style={{ ...typoSecondary(), marginBottom: SPACE.sm }}>Sicherung einspielen</div>
+                  <textarea value={importPasteText} onChange={e => setImportPasteText(e.target.value)} rows={3}
+                    placeholder="Gesicherten Text hier einfügen…"
+                    style={{ ...inputStyle, background: T.background, fontSize: FONT.xs, fontFamily: "'IBM Plex Mono', monospace", resize: 'vertical' }} />
+                  <button className="press" onClick={importFromPaste} style={{ ...btnSecondary(T), marginTop: SPACE.md, opacity: importPasteText.trim() ? 1 : .5 }} disabled={!importPasteText.trim()}>
+                    Einfügen & importieren
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <div style={{ ...typoH2(), marginBottom: SPACE.md }}>Konto</div>
+              <AuthScreen T={T} auth={auth} sync={sync} cardCount={cards.length} />
+            </div>
+          </div>
         )}
 
         {/* ---------- DASHBOARD ---------- */}
@@ -1121,16 +1407,14 @@ export default function VokabelTrainer() {
             <div style={{ marginBottom: SPACE.xxxl }}>
               <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: SPACE.md, gap: SPACE.sm }}>
                 <div style={{ ...typoH2() }}>Kartenboxen</div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: SPACE.lg, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: SPACE.sm, fontSize: FONT.sm, color: T.textSecondary }}>
-                    Neu/Tag:
-                    <input
-                      type="number" min={0} value={newCardsPerDay}
-                      onChange={e => setNewCardsPerDay(Math.max(0, Number(e.target.value) || 0))}
-                      style={{ width: 52, padding: `${SPACE.xs}px ${SPACE.sm}px`, borderRadius: RADIUS.sm, border: `1px solid ${T.border}`, background: T.surfaceElevated, color: T.textPrimary, fontSize: FONT.sm, textAlign: 'center' }}
-                    />
-                  </label>
-                </div>
+                <label style={{ display: 'flex', alignItems: 'center', gap: SPACE.sm, fontSize: FONT.sm, color: T.textSecondary }}>
+                  Neu/Tag:
+                  <input
+                    type="number" min={0} value={newCardsPerDay}
+                    onChange={e => setNewCardsPerDay(Math.max(0, Number(e.target.value) || 0))}
+                    style={{ width: 52, padding: `${SPACE.xs}px ${SPACE.sm}px`, borderRadius: RADIUS.sm, border: `1px solid ${T.border}`, background: T.surfaceElevated, color: T.textPrimary, fontSize: FONT.sm, textAlign: 'center' }}
+                  />
+                </label>
               </div>
 
               {/* Ein Behaelter mit eigenem Grund: auf dem fast schwarzen Seitengrund
@@ -1260,92 +1544,194 @@ export default function VokabelTrainer() {
         )}
 
         {/* ---------- BROWSE ---------- */}
-        {view === 'browse' && (
+        {view === 'browse' && !browseStapel && (
           <div>
             <div style={{ ...typoDisplay(), marginBottom: SPACE.lg }}>Karten</div>
 
-            <div style={{ display: 'flex', gap: SPACE.sm, marginBottom: SPACE.lg, flexWrap: 'wrap' }}>
-              <div style={{ position: 'relative', flex: 1, minWidth: 220 }}>
+            {/* Erst die Stapel, dann die Vokabeln. Alles auf einmal ist bei
+                einer gewachsenen Kartei nicht zu ueberblicken - und ein Stapel
+                ist die Einheit, in der man ohnehin denkt.
+                Die Fehlerkartei fehlt hier bewusst: sie ist kein eigener
+                Stapel, sondern ein Querschnitt (isDifficult). Ihre Karten
+                liegen schon in ihrem Sprachstapel und stuenden doppelt da. */}
+            {decks.length > 0 ? (
+              <div style={{ ...surfaceSoft(T), border: `1px solid ${T.hairline}`, padding: `0 ${SPACE.sm}px`, overflow: 'hidden' }}>
+                {decks.map((d, i) => (
+                  <button
+                    key={d.key} className="press row-link"
+                    onClick={() => setBrowseStapel(d.key)}
+                    style={{
+                      width: '100%', background: 'none', border: 'none', font: 'inherit',
+                      color: 'inherit', cursor: 'pointer', textAlign: 'left',
+                      display: 'flex', alignItems: 'center', gap: SPACE.md,
+                      padding: `${SPACE.lg}px ${SPACE.md}px`,
+                      ...(i > 0 ? divider(T) : null),
+                    }}>
+                    <span style={{ display: 'flex', flexShrink: 0 }}>
+                      {d.type === 'gap'
+                        ? <PenLine size={18} strokeWidth={1.5} color={T.primary} />
+                        : <BookOpen size={18} strokeWidth={1.5} color={T.primary} />}
+                    </span>
+                    <span style={{ flex: 1, minWidth: 0 }}>
+                      <span style={{ ...typoBody('lg'), display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {d.label}
+                      </span>
+                      <span style={{ ...typoCaption(), color: T.textSecondary }}>
+                        {d.total} {d.total === 1 ? 'Karte' : 'Karten'}
+                      </span>
+                    </span>
+                    <ChevronRight size={16} style={{ flexShrink: 0, color: T.textSecondary }} />
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <div style={{ ...surfaceSoft(T), border: `1px solid ${T.hairline}`, padding: SPACE.xxl, textAlign: 'center' }}>
+                <BookOpen size={28} strokeWidth={1.5} color={T.primary} />
+                <div style={{ ...typoH2(), margin: `${SPACE.md}px 0 ${SPACE.lg}px` }}>Noch keine Karten</div>
+                <button className="press" onClick={() => setView('add')} style={btnPrimary(T)}>
+                  <Plus size={16} /> Vokabeln anlegen
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
+        {view === 'browse' && browseStapel && (
+          <div>
+            {/* Zurueck zur Stapeluebersicht. Der Stapelname traegt hier die
+                Ueberschrift - "Karten" waere zweimal dasselbe Wort. */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: SPACE.sm, marginBottom: SPACE.lg }}>
+              <button className="press" onClick={() => setBrowseStapel(null)} aria-label="Zurück zu den Stapeln"
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: T.textSecondary, padding: 4, display: 'flex', flexShrink: 0 }}>
+                <ChevronLeft size={22} />
+              </button>
+              <div style={{ ...typoDisplay(), minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {decks.find(d => d.key === browseStapel)?.label || 'Karten'}
+              </div>
+            </div>
+
+            <div className="karten-werkzeuge" style={{ display: 'flex', gap: SPACE.sm, marginBottom: SPACE.lg, flexWrap: 'wrap' }}>
+              <div className="karten-suche" style={{ position: 'relative' }}>
                 <Search size={16} style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', color: T.textSecondary, pointerEvents: 'none' }} />
                 <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Suchen…"
                   style={{ ...inputStyle, paddingLeft: 40 }} />
               </div>
               <select value={filter} onChange={e => setFilter(e.target.value)}
-                style={{ ...inputStyle, width: 'auto', cursor: 'pointer' }}>
+                style={{ ...inputStyle, width: undefined, cursor: 'pointer' }}>
+                {/* "Nur Vokabeln"/"Nur Sätze" gibt es hier nicht mehr: ein
+                    Stapel hat genau einen Typ, die Wahl waere ohne Wirkung. */}
                 <option value="all">Alle</option>
-                <option value="vocab">Nur Vokabeln</option>
-                <option value="gap">Nur Sätze</option>
                 <option value="new">Neu</option>
                 <option value="due">Heute fällig</option>
                 <option value="difficult">Schwierig</option>
               </select>
-              <button className="press" onClick={exportJSON} style={btnSecondary(T)}><Download size={15} /> Export</button>
-              <button className="press" onClick={() => importFileRef.current.click()} style={btnSecondary(T)}><Upload size={15} /> Import</button>
-              <input ref={importFileRef} type="file" accept=".json" style={{ display: 'none' }} onChange={importJSON} />
+              {/* Traegt die Sortierung auf jeder Breite: am Handy als einziger
+                  Weg, am Desktop zusaetzlich zu den Spaltenkoepfen - denn
+                  "Zuletzt angelegt" und "Fehlerquote" haben keine eigene
+                  Spalte und waeren sonst dort nicht erreichbar. */}
+              <select value={sortierung.feld}
+                onChange={e => setSortierung({ feld: e.target.value, ab: SORTIERFELDER[e.target.value].ab })}
+                aria-label="Sortierung"
+                style={{ ...inputStyle, width: undefined, cursor: 'pointer' }}>
+                {Object.entries(SORTIERFELDER).map(([k, v]) => (
+                  <option key={k} value={k}>{v.label}</option>
+                ))}
+              </select>
             </div>
 
-            {exportText !== null && (
-              <div className="rise-in" style={{ ...surfaceSoft(T), padding: SPACE.lg, marginBottom: SPACE.lg }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: SPACE.md }}>
-                  <div style={{ ...typoSecondary() }}>Sicherung</div>
-                  <button className="press" onClick={() => setExportText(null)} style={btnGhost(T)}>Schließen</button>
-                </div>
-                <textarea ref={exportTextareaRef} readOnly value={exportText} rows={5}
-                  onFocus={e => e.target.select()}
-                  style={{ ...inputStyle, background: T.background, fontSize: FONT.xs, fontFamily: "'IBM Plex Mono', monospace", resize: 'vertical' }} />
-                <div style={{ display: 'flex', gap: SPACE.md, marginTop: SPACE.md, alignItems: 'center', flexWrap: 'wrap' }}>
-                  <button className="press" onClick={copyExportText} style={btnPrimary(T)}>Kopieren</button>
-                </div>
+            {/* Kopfzeile der Liste: Anzahl links, Auswahl rechts. Solange
+                nichts markiert ist, steht hier nur ein stiller Knopf - die
+                Mehrfachauswahl draengt sich nicht auf. */}
+            <div style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              gap: SPACE.md, marginBottom: SPACE.sm, minHeight: 34,
+            }}>
+              <div style={{ fontSize: FONT.sm, color: T.textSecondary }}>
+                {sortiert.length} {sortiert.length === 1 ? 'Karte' : 'Karten'}
+                {sucheAktiv.trim() && cards.length !== sortiert.length ? ` von ${cards.length}` : ''}
               </div>
-            )}
-
-            <div style={{ fontSize: FONT.sm, color: T.textSecondary, marginBottom: SPACE.md }}>{filtered.length} Karte(n)</div>
-            {/* Auch hier eine Liste statt vieler Einzelkarten - bei hunderten
-                Eintraegen waere jede eigene Umrandung nur Unruhe. */}
-            <div style={{ display: 'flex', flexDirection: 'column' }}>
-              {filtered.map((c, i) => (
-                <div key={c.id} className="row-link" style={{
-                  padding: `${SPACE.md}px ${SPACE.md}px`, borderRadius: RADIUS.md,
-                  display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: SPACE.md,
-                  ...(i > 0 ? divider(T) : null),
-                }}>
-                  <div style={{ minWidth: 0 }}>
-                    {c.type === 'gap' ? (
-                      <div style={{ ...typoSecondary(), overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{revealSentence(c.sentence)}</div>
-                    ) : (
-                      <div style={{ ...typoSecondary() }}>{cardSides(c).front.answer} <span style={{ ...typoBody(), color: T.textSecondary }}>→</span> {cardSides(c).back.answer}</div>
-                    )}
-                    <div className="nums" style={{ fontSize: FONT.xs, color: T.textMuted, marginTop: 3 }}>
-                      {c.type === 'gap' ? `Satz · ${c.language}` : `${c.langA} → ${c.langB}`} · fällig {c.dueDate} · {c.totalReviews || 0}×
-                    </div>
+              {sortiert.length > 0 && (
+                auswahlModus ? (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: SPACE.sm, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                    <button className="press" onClick={alleUmschalten} style={btnGhost(T, 'sm')}>
+                      {alleSichtbarenMarkiert ? 'Keine' : 'Alle'}
+                    </button>
+                    <button className="press" onClick={auswahlBeenden} style={btnGhost(T, 'sm')}>Fertig</button>
                   </div>
-                  <button className="press" onClick={() => deleteCard(c.id)} aria-label="Karte löschen"
-                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: T.textSecondary, flexShrink: 0, padding: 6, display: 'flex' }}>
-                    <Trash2 size={16} />
+                ) : (
+                  <button className="press" onClick={() => setAuswahlModus(true)} style={btnGhost(T, 'sm')}>
+                    <CheckSquare size={14} /> Auswählen
                   </button>
-                </div>
+                )
+              )}
+            </div>
+
+            {/* Spaltenkoepfe nur am breiten Bildschirm. Die Sichtbarkeit haengt
+                allein an der Medienabfrage in globalCss - ein inline display
+                wuerde sie schlagen und die Koepfe auch am Handy zeigen. */}
+            <div className="karten-kopf" style={{
+              alignItems: 'center', gap: SPACE.md,
+              padding: `${SPACE.sm}px ${SPACE.md}px`,
+              borderBottom: `1px solid ${T.border}`,
+              ...typoCaption(), color: T.textSecondary,
+            }}>
+              {auswahlModus && <span style={{ width: 18, flexShrink: 0 }} />}
+              <SortKopf T={T} feld="alpha" label="Karte" sortierung={sortierung} onSort={sortierenNach} style={{ flex: 1, minWidth: 0 }} />
+              <SortKopf T={T} feld="stapel" label="Stapel" sortierung={sortierung} onSort={sortierenNach} style={{ width: 150, flexShrink: 0 }} />
+              <SortKopf T={T} feld="faellig" label="Fällig" sortierung={sortierung} onSort={sortierenNach} style={{ width: 110, flexShrink: 0, justifyContent: 'flex-end' }} />
+              <SortKopf T={T} feld="wdh" label="Wdh." sortierung={sortierung} onSort={sortierenNach} style={{ width: 90, flexShrink: 0, justifyContent: 'flex-end' }} />
+              <span style={{ width: 28, flexShrink: 0 }} />
+            </div>
+
+            {/* Gezeichnet wird nur der sichtbare Ausschnitt; die beiden
+                Platzhalter halten die Bildlaufleiste auf voller Laenge. */}
+            <div ref={fenster.ref} className="karten-liste" style={{ position: 'relative' }}>
+              <div style={{ height: fenster.obenPx }} />
+              {sortiert.slice(fenster.von, fenster.bis).map(c => (
+                <KartenZeile
+                  key={c.id} T={T} card={c}
+                  auswahlModus={auswahlModus}
+                  markiert={markiert.has(c.id)}
+                  onMarkieren={() => markierungUmschalten(c.id)}
+                  onLoeschen={() => deleteCard(c.id)}
+                />
               ))}
-              {filtered.length === 0 && (
+              <div style={{ height: fenster.untenPx }} />
+              {sortiert.length === 0 && (
                 <div style={{ color: T.textSecondary, textAlign: 'center', padding: SPACE.xxl }}>
                   Keine Karten gefunden.
                 </div>
               )}
             </div>
-
-            {/* Selten gebraucht, deshalb hinter der Kartenliste - ohne Kasten
-                muss die Reihenfolge die Rangfolge tragen. */}
-            <div style={{ marginTop: SPACE.xxxl }}>
-              <div style={{ ...typoSecondary(), marginBottom: SPACE.md }}>Sicherung einspielen</div>
-              <textarea value={importPasteText} onChange={e => setImportPasteText(e.target.value)} rows={3}
-                placeholder="Gesicherten Text hier einfügen…"
-                style={{ ...inputStyle, background: T.background, fontSize: FONT.xs, fontFamily: "'IBM Plex Mono', monospace", resize: 'vertical' }} />
-              <button className="press" onClick={importFromPaste} style={{ ...btnSecondary(T), marginTop: SPACE.md, opacity: importPasteText.trim() ? 1 : .5 }} disabled={!importPasteText.trim()}>
-                Einfügen & importieren
-              </button>
-            </div>
           </div>
         )}
       </div>
+
+      {/* Aktionsleiste der Mehrfachauswahl. Liegt ueber der Navigation und
+          nur, solange wirklich etwas markiert ist - eine dauerhaft sichtbare
+          Leiste waere im Normalfall nur eine verstellte Zeile. */}
+      {view === 'browse' && markiert.size > 0 && (
+        <div className="rise-in auswahl-leiste" style={{
+          position: 'fixed', left: '50%',
+          transform: 'translateX(-50%)', zIndex: 30,
+          display: 'flex', alignItems: 'center', gap: SPACE.md,
+          background: hexToRgba(T.surfaceElevated, .97), backdropFilter: 'blur(12px)',
+          border: `1px solid ${T.border}`, borderRadius: RADIUS.pill,
+          boxShadow: T.shadowLift, padding: `${SPACE.sm}px ${SPACE.md}px`,
+          maxWidth: 'calc(100vw - 32px)',
+        }}>
+          <span style={{ ...typoSecondary('sm'), color: T.textSecondary, whiteSpace: 'nowrap' }}>
+            {markiert.size} ausgewählt
+          </span>
+          <button className="press" onClick={markierteLoeschen}
+            style={{ ...btnOutline(T, 'sm'), color: T.error, borderColor: T.error, whiteSpace: 'nowrap' }}>
+            <Trash2 size={14} /> Löschen
+          </button>
+          <button className="press" onClick={auswahlBeenden} style={btnGhost(T, 'sm')}>
+            Abbrechen
+          </button>
+        </div>
+      )}
 
       {/* Navigationsleiste unten - schwebende Pille mittig statt einer
           Leiste von Rand zu Rand, damit sie nicht an den Bildschirmkanten klebt. */}
