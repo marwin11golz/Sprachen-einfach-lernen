@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   Plus, Search, BarChart3, Layers, CheckCircle2, XCircle, Sun, Moon, X,
   Download, Trash2, Volume2, Upload, BookOpen, PenLine, ChevronRight, Repeat,
-  MinusCircle, Star, AlertTriangle, Settings, ArrowUp, ArrowDown, CheckSquare, Square,
+  MinusCircle, Star, AlertTriangle, Settings, ArrowUp, ArrowDown, CheckSquare, Square, ChevronLeft,
 } from 'lucide-react';
 
 import {
@@ -378,6 +378,10 @@ export default function VokabelTrainer() {
   // Reihenfolge der Kartenliste. "neu" heisst zuletzt angelegt zuerst - das
   // war schon vorher die Vorgabe, nur ohne Wahlmoeglichkeit.
   const [sortierung, setSortierung] = useState({ feld: 'neu', ab: false });
+  // Welcher Stapel in der Kartenverwaltung offen ist. null heisst: die
+  // Uebersicht. Der Zwischenschritt ist der Punkt der Ansicht - alle Vokabeln
+  // auf einmal sind bei einer gewachsenen Kartei nicht zu ueberblicken.
+  const [browseStapel, setBrowseStapel] = useState(null);
   // IDs der markierten Karten. Set statt Array: die Zeile fragt bei jedem
   // Zeichnen "bin ich dabei?", und das muss bei tausend Karten billig sein.
   const [markiert, setMarkiert] = useState(() => new Set());
@@ -683,7 +687,10 @@ export default function VokabelTrainer() {
 
   // --- Browse ---
   const filtered = useMemo(() => {
-    let list = cards;
+    // Immer nur der offene Stapel: die Ansicht zeigt nie den ganzen Bestand
+    // auf einmal. Alles Weitere - Sortierung, Fenster-Rendering, Auswahl -
+    // haengt an dieser Liste und bleibt dadurch unveraendert.
+    let list = browseStapel ? cards.filter(c => deckKeyOf(c) === browseStapel) : [];
     const q = sucheAktiv.trim().toLowerCase();
     if (q) list = list.filter(c => {
       const hay = c.type === 'gap' ? `${c.sentence} ${c.back}` : `${c.front} ${c.back}`;
@@ -695,7 +702,7 @@ export default function VokabelTrainer() {
     if (filter === 'vocab') list = list.filter(c => c.type === 'vocab');
     if (filter === 'gap') list = list.filter(c => c.type === 'gap');
     return list;
-  }, [cards, sucheAktiv, filter]);
+  }, [cards, sucheAktiv, filter, browseStapel]);
 
   // Sortieren steht bewusst in einem EIGENEN Memo hinter dem Filtern: so
   // laeuft beim Umstellen der Reihenfolge nicht auch noch die Suche neu, und
@@ -722,7 +729,14 @@ export default function VokabelTrainer() {
   // --- Mehrfachauswahl ---
   // Beim Wechsel von Suche oder Filter faellt die Markierung weg: sonst
   // loescht "N ausgewählt" auch Karten, die gerade gar nicht zu sehen sind.
-  useEffect(() => { setMarkiert(new Set()); }, [sucheAktiv, filter]);
+  useEffect(() => { setMarkiert(new Set()); }, [sucheAktiv, filter, browseStapel]);
+
+  // Beim Verlassen der Kartenverwaltung zurueck auf die Uebersicht: wer sie
+  // spaeter wieder oeffnet, soll bei den Stapeln landen und nicht mitten in
+  // einer Vokabelliste, die er laengst vergessen hat.
+  useEffect(() => {
+    if (view !== 'browse') { setBrowseStapel(null); setSearch(''); setAuswahlModus(false); }
+  }, [view]);
 
   const markierungUmschalten = (id) => {
     setMarkiert(prev => {
@@ -1530,9 +1544,71 @@ export default function VokabelTrainer() {
         )}
 
         {/* ---------- BROWSE ---------- */}
-        {view === 'browse' && (
+        {view === 'browse' && !browseStapel && (
           <div>
             <div style={{ ...typoDisplay(), marginBottom: SPACE.lg }}>Karten</div>
+
+            {/* Erst die Stapel, dann die Vokabeln. Alles auf einmal ist bei
+                einer gewachsenen Kartei nicht zu ueberblicken - und ein Stapel
+                ist die Einheit, in der man ohnehin denkt.
+                Die Fehlerkartei fehlt hier bewusst: sie ist kein eigener
+                Stapel, sondern ein Querschnitt (isDifficult). Ihre Karten
+                liegen schon in ihrem Sprachstapel und stuenden doppelt da. */}
+            {decks.length > 0 ? (
+              <div style={{ ...surfaceSoft(T), border: `1px solid ${T.hairline}`, padding: `0 ${SPACE.sm}px`, overflow: 'hidden' }}>
+                {decks.map((d, i) => (
+                  <button
+                    key={d.key} className="press row-link"
+                    onClick={() => setBrowseStapel(d.key)}
+                    style={{
+                      width: '100%', background: 'none', border: 'none', font: 'inherit',
+                      color: 'inherit', cursor: 'pointer', textAlign: 'left',
+                      display: 'flex', alignItems: 'center', gap: SPACE.md,
+                      padding: `${SPACE.lg}px ${SPACE.md}px`,
+                      ...(i > 0 ? divider(T) : null),
+                    }}>
+                    <span style={{ display: 'flex', flexShrink: 0 }}>
+                      {d.type === 'gap'
+                        ? <PenLine size={18} strokeWidth={1.5} color={T.primary} />
+                        : <BookOpen size={18} strokeWidth={1.5} color={T.primary} />}
+                    </span>
+                    <span style={{ flex: 1, minWidth: 0 }}>
+                      <span style={{ ...typoBody('lg'), display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {d.label}
+                      </span>
+                      <span style={{ ...typoCaption(), color: T.textSecondary }}>
+                        {d.total} {d.total === 1 ? 'Karte' : 'Karten'}
+                      </span>
+                    </span>
+                    <ChevronRight size={16} style={{ flexShrink: 0, color: T.textSecondary }} />
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <div style={{ ...surfaceSoft(T), border: `1px solid ${T.hairline}`, padding: SPACE.xxl, textAlign: 'center' }}>
+                <BookOpen size={28} strokeWidth={1.5} color={T.primary} />
+                <div style={{ ...typoH2(), margin: `${SPACE.md}px 0 ${SPACE.lg}px` }}>Noch keine Karten</div>
+                <button className="press" onClick={() => setView('add')} style={btnPrimary(T)}>
+                  <Plus size={16} /> Vokabeln anlegen
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
+        {view === 'browse' && browseStapel && (
+          <div>
+            {/* Zurueck zur Stapeluebersicht. Der Stapelname traegt hier die
+                Ueberschrift - "Karten" waere zweimal dasselbe Wort. */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: SPACE.sm, marginBottom: SPACE.lg }}>
+              <button className="press" onClick={() => setBrowseStapel(null)} aria-label="Zurück zu den Stapeln"
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: T.textSecondary, padding: 4, display: 'flex', flexShrink: 0 }}>
+                <ChevronLeft size={22} />
+              </button>
+              <div style={{ ...typoDisplay(), minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {decks.find(d => d.key === browseStapel)?.label || 'Karten'}
+              </div>
+            </div>
 
             <div className="karten-werkzeuge" style={{ display: 'flex', gap: SPACE.sm, marginBottom: SPACE.lg, flexWrap: 'wrap' }}>
               <div className="karten-suche" style={{ position: 'relative' }}>
@@ -1542,9 +1618,9 @@ export default function VokabelTrainer() {
               </div>
               <select value={filter} onChange={e => setFilter(e.target.value)}
                 style={{ ...inputStyle, width: undefined, cursor: 'pointer' }}>
+                {/* "Nur Vokabeln"/"Nur Sätze" gibt es hier nicht mehr: ein
+                    Stapel hat genau einen Typ, die Wahl waere ohne Wirkung. */}
                 <option value="all">Alle</option>
-                <option value="vocab">Nur Vokabeln</option>
-                <option value="gap">Nur Sätze</option>
                 <option value="new">Neu</option>
                 <option value="due">Heute fällig</option>
                 <option value="difficult">Schwierig</option>
