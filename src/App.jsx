@@ -1272,41 +1272,20 @@ export default function VokabelTrainer() {
           </div>
         )}
 
-        {/* ---------- EINSTELLUNGEN ----------
-            Alles, was Verwaltung ist und vorher im Arbeitsbereich stand:
-            das Tageslimit hing neben der Ueberschrift "Kartenboxen", Export
-            und Import in der Werkzeugleiste der Kartenliste, das Einspielen
-            einer Sicherung als vierter Block darunter. Hier zusammen, damit
-            Dashboard und Kartenliste nur noch Inhalt zeigen. */}
+        {/* ---------- MEHR ----------
+            Export, Import und Konto - Verwaltung, die vorher die Kartenliste
+            zumuellte (Export/Import in der Werkzeugleiste, das Einspielen
+            einer Sicherung als vierter Block unter den Karten). Das
+            Tageslimit bleibt bewusst auf dem Dashboard: es gehoert zum
+            taeglichen Lernen und wird dort gebraucht, nicht in der
+            Verwaltung. */}
         {view === 'settings' && (
           <div style={{ maxWidth: 640, margin: '0 auto' }}>
             <div style={{ ...typoDisplay(), marginBottom: SPACE.xl }}>Mehr</div>
 
             <div style={{ marginBottom: SPACE.xxxl }}>
-              <div style={{ ...typoH2(), marginBottom: SPACE.md }}>Lernen</div>
-              <div style={{ ...surfaceSoft(T), border: `1px solid ${T.hairline}`, padding: SPACE.lg }}>
-                <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: SPACE.lg }}>
-                  <span>
-                    <span style={{ ...typoBody('lg'), display: 'block' }}>Neue Karten pro Tag</span>
-                    <span style={{ ...typoCaption(), color: T.textSecondary }}>
-                      Gilt nur für neue Karten – Wiederholungen sind nie gedeckelt.
-                    </span>
-                  </span>
-                  <input
-                    type="number" min={0} value={newCardsPerDay}
-                    onChange={e => setNewCardsPerDay(Math.max(0, Number(e.target.value) || 0))}
-                    style={{ width: 64, flexShrink: 0, padding: `${SPACE.sm}px ${SPACE.sm}px`, borderRadius: RADIUS.sm, border: `1px solid ${T.border}`, background: T.surfaceElevated, color: T.textPrimary, fontSize: FONT.md, textAlign: 'center' }}
-                  />
-                </label>
-              </div>
-            </div>
-
-            <div style={{ marginBottom: SPACE.xxxl }}>
               <div style={{ ...typoH2(), marginBottom: SPACE.md }}>Daten</div>
               <div style={{ ...surfaceSoft(T), border: `1px solid ${T.hairline}`, padding: SPACE.lg }}>
-                <div style={{ ...typoBody(), color: T.textSecondary, marginBottom: SPACE.md }}>
-                  {cards.length} {cards.length === 1 ? 'Karte' : 'Karten'} auf diesem Gerät.
-                </div>
                 <div style={{ display: 'flex', gap: SPACE.sm, flexWrap: 'wrap' }}>
                   <button className="press" onClick={exportJSON} style={btnSecondary(T)}><Download size={15} /> Export</button>
                   <button className="press" onClick={() => importFileRef.current.click()} style={btnSecondary(T)}><Upload size={15} /> Import</button>
@@ -1412,9 +1391,17 @@ export default function VokabelTrainer() {
 
             {/* ---- 3. Kartenboxen ---- */}
             <div style={{ marginBottom: SPACE.xxxl }}>
-              {/* Das Tageslimit stand frueher hier neben der Ueberschrift - eine
-                  Einstellung mitten im Inhalt. Sie liegt jetzt unter "Mehr". */}
-              <div style={{ ...typoH2(), marginBottom: SPACE.md }}>Kartenboxen</div>
+              <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: SPACE.md, gap: SPACE.sm }}>
+                <div style={{ ...typoH2() }}>Kartenboxen</div>
+                <label style={{ display: 'flex', alignItems: 'center', gap: SPACE.sm, fontSize: FONT.sm, color: T.textSecondary }}>
+                  Neu/Tag:
+                  <input
+                    type="number" min={0} value={newCardsPerDay}
+                    onChange={e => setNewCardsPerDay(Math.max(0, Number(e.target.value) || 0))}
+                    style={{ width: 52, padding: `${SPACE.xs}px ${SPACE.sm}px`, borderRadius: RADIUS.sm, border: `1px solid ${T.border}`, background: T.surfaceElevated, color: T.textPrimary, fontSize: FONT.sm, textAlign: 'center' }}
+                  />
+                </label>
+              </div>
 
               {/* Ein Behaelter mit eigenem Grund: auf dem fast schwarzen Seitengrund
                   verschwand die Liste sonst. Die Fehlerkartei liegt als letzte Zeile
