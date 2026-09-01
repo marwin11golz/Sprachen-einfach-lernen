@@ -142,6 +142,17 @@ function nextInterval(S) {
   return Math.min(MAX_INTERVAL, Math.max(1, Math.round(raw)));
 }
 
+// Deckel fuer "Schwer" nach der Anfangsphase - gespiegelt aus src/lib/fsrs.js.
+// nextInterval() kennt nur die Stabilitaet, und die waechst auch bei "Schwer";
+// ohne den Deckel sprang eine muehsam erinnerte Karte von 140 auf 222 Tage.
+// Weicht der Faktor hier ab, terminiert dieselbe Karte im Chat anders als in
+// der App.
+const HARD_FAKTOR = 0.9;
+function hardInterval(vorherigesIntervall, S) {
+  const gedeckelt = Math.max(1, Math.round((vorherigesIntervall || 0) * HARD_FAKTOR));
+  return Math.min(nextInterval(S), gedeckelt);
+}
+
 // Abstand zweier Lerntage in KALENDERTAGEN - siehe daysBetween() in
 // src/lib/srs.js: die fruehere Rundung auf die Uhrzeit zaehlte nachmittags
 // jedes Mal einen Tag zu viel und blaehte die Intervalle auf.
@@ -159,6 +170,13 @@ function seedFromLegacy(card) {
   const ease = Math.min(3.0, Math.max(1.3, card.ease ?? 2.5));
   const difficulty = Math.min(10, Math.max(1, 1 + ((3.0 - ease) / 1.7) * 9));
   return { stability: Math.max(interval, STABILITY_MIN), difficulty };
+}
+
+// Sichere Bewertungen in Folge - gespiegelt aus src/lib/srs.js. "Schwer"
+// zaehlt hier NICHT als Erfolg, anders als bei earlyStep.
+function erholungsStreak(card) {
+  if (Number.isFinite(card.recoveryStreak)) return card.recoveryStreak;
+  return Number.isFinite(card.earlyStep) ? card.earlyStep : (card.totalReviews || 0);
 }
 
 // Identisch zur rate()-Funktion in src/lib/srs.js - bewusst dupliziert statt
@@ -200,8 +218,18 @@ function rate(card, rating) {
   // weiter, uebersteuert ist nur die Wahl des Faelligkeitsdatums.
   const stufe = Number.isFinite(c.earlyStep) ? c.earlyStep : (c.totalReviews || 0);
   const fest = earlyInterval(stufe, rating);
-  c.interval = fest != null ? fest : nextInterval(c.stability);
+  const straehne = erholungsStreak(c);
+  c.interval = fest != null
+    ? fest
+    : (rating === 'hard' ? hardInterval(c.interval, c.stability) : nextInterval(c.stability));
   c.earlyStep = rating === 'again' ? 0 : Math.min(EARLY_COUNT, stufe + 1);
+  // Erholungs-Straehne der Fehlerkartei - gespiegelt aus src/lib/srs.js. Wird
+  // hier zwar von keinem Befehl gelesen, muss aber mitgeschrieben werden: sonst
+  // stuende eine im Chat bewertete Karte in der App mit einer veralteten
+  // Straehne da und faele zu frueh oder zu spaet aus der Fehlerkartei.
+  c.recoveryStreak = (rating === 'good' || rating === 'easy')
+    ? Math.min(EARLY_COUNT, straehne + 1)
+    : 0;
 
   const due = new Date(today);
   due.setDate(due.getDate() + c.interval);
@@ -221,7 +249,7 @@ function newCard(fields) {
   return {
     id: uid(),
     ease: 2.5, interval: 0, repetitions: 0, dueDate: todayISO(),
-    stability: null, difficulty: null, earlyStep: 0,
+    stability: null, difficulty: null, earlyStep: 0, recoveryStreak: 0,
     createdAt: todayISO(), lastReviewed: null, totalReviews: 0, correct: 0, wrong: 0,
     updatedAt: new Date().toISOString(), deleted: false,
     ...fields,

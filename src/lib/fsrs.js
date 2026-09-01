@@ -137,3 +137,30 @@ export function nextInterval(S) {
   const raw = (S / FACTOR) * (Math.pow(RETENTION, 1 / DECAY) - 1);
   return Math.min(MAX_INTERVAL, Math.max(1, Math.round(raw)));
 }
+
+// Deckel fuer "Schwer" NACH der Anfangsphase.
+//
+// Ohne ihn ist "Schwer" dort praktisch wirkungslos: nextInterval() kennt nur
+// die Stabilitaet, und die waechst auch bei "Schwer" - die Bewertung daempft
+// ueber W[15] nur, WIE STARK sie waechst. Eine Karte, die nach 140 Tagen mit
+// Muehe erinnert wurde, sprang deshalb auf 222 Tage: WEITER hinaus als beim
+// letzten Mal und nur ein Fuenftel unter den 272 Tagen, die "Gut" gegeben
+// haette. Wer "Schwer" drueckt, sagt aber das Gegenteil - die Karte sass nicht.
+//
+// Der Faktor liegt bewusst UNTER 1 und damit unter Ankis "Hard" (dort 1,2 auf
+// das letzte Intervall). Mit 1,2 waere "Schwer" nur langsameres Wachstum: eine
+// Karte, die man fuenfmal hintereinander muehsam erinnert, kletterte trotzdem
+// 140 → 168 → 202 → 242 → 290 Tage. Mit 0,9 rueckt sie stattdessen jedes Mal
+// naeher (140 → 126 → 113), was der Bewertung entspricht - "Schwer" heisst,
+// dass der Abruf gehakt hat, also gehoert die Karte frueher wieder vorgelegt
+// und nicht weiter weggeschoben.
+//
+// Gedeckelt wird nur nach OBEN: rechnet FSRS von sich aus knapper - was es bei
+// niedriger Stabilitaet tut -, gilt weiter der kleinere Wert. Und nie unter
+// einen Tag, weil dueDate ein Datum ist.
+export const HARD_FAKTOR = 0.9;
+
+export function hardInterval(vorherigesIntervall, S) {
+  const gedeckelt = Math.max(1, Math.round((vorherigesIntervall || 0) * HARD_FAKTOR));
+  return Math.min(nextInterval(S), gedeckelt);
+}

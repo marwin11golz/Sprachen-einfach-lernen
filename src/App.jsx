@@ -8,7 +8,7 @@ import {
 import {
   levenshtein, todayISO, cardSides, relativerTag,
   parseGapLine, revealSentence,
-  deckKeyOf, deckLabelOf,
+  deckKeyOf, deckLabelOf, erholungsStreak,
   newVocabCard, newGapCard,
   VOCAB_PAIRS, SENTENCE_LANGS, langCodeOf,
 } from './lib/srs.js';
@@ -40,12 +40,14 @@ const DECK_FEHLER = '__fehlerkartei';
 // laengerer Nutzung stuenden dort irgendwann hunderte laengst sitzende Karten,
 // und "wiederholen" waere witzlos.
 //
-// `earlyStep` zaehlt bereits genau das Richtige mit: aufeinanderfolgende
-// erfolgreiche Bewertungen seit dem letzten Fehler, zurueckgesetzt auf 0 bei
-// jedem "Nochmal" (siehe rate() in srs.js) - ein zweites Feld dafuer waere
-// dieselbe Information doppelt. Zaehlt mit, unabhaengig von der Staerke der
-// Bewertung: auch eine Reihe aus "Schwer" ist erfolgreiches Erinnern, nur ein
-// muehsameres.
+// Gezaehlt wird in `recoveryStreak` (siehe erholungsStreak in srs.js), und
+// zwar NUR "Gut" und "Einfach": "Schwer" setzt die Straehne zurueck wie ein
+// "Nochmal". Das ist die Bewertung, mit der man sagt "die sitzt noch nicht" -
+// eine Karte, die man dreimal muehsam hervorgekramt hat, ist genau die, die man
+// weiter ueben will, und sie hier zu entlassen waere das Gegenteil dessen,
+// wozu der Stapel da ist. Frueher hing das an `earlyStep`; der muss aber auch
+// bei "Schwer" weiterruecken, weil er das Faelligkeitsdatum auf der
+// Anfangsleiter waehlt - deshalb jetzt zwei Zaehler statt einem.
 const FEHLERKARTEI_ERHOLT = 3;
 
 // Zeilenhoehe der Kartenliste in Pixeln. Muss zum tatsaechlichen Layout
@@ -529,7 +531,7 @@ export default function VokabelTrainer() {
   // Die Fehlerkartei ist ein Stapel wie jeder andere: sie sammelt automatisch,
   // was schon einmal falsch war - und laesst wieder los, was sich seitdem
   // erholt hat (siehe FEHLERKARTEI_ERHOLT oben).
-  const isDifficult = (c) => (c.wrong || 0) > 0 && (c.earlyStep ?? 0) < FEHLERKARTEI_ERHOLT;
+  const isDifficult = (c) => (c.wrong || 0) > 0 && erholungsStreak(c) < FEHLERKARTEI_ERHOLT;
   const difficultDeck = useMemo(() => {
     const list = cards.filter(isDifficult)
       .sort((a, b) => (b.wrong / (b.totalReviews || 1)) - (a.wrong / (a.totalReviews || 1)));
