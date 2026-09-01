@@ -81,6 +81,25 @@ function seedFromLegacy(card) {
   return { stability: Math.max(interval, STABILITY_MIN), difficulty };
 }
 
+// Wie viele Bewertungen IN FOLGE eine Karte zuletzt sicher sass - die Zahl,
+// an der die Fehlerkartei entscheidet, ob eine Karte sich erholt hat.
+//
+// Bewusst ein eigenes Feld und NICHT earlyStep, obwohl beide "seit dem letzten
+// Fehler" zaehlen: earlyStep waehlt das Faelligkeitsdatum auf der Anfangsleiter
+// und muss deshalb auch bei "Schwer" weiterruecken - sonst haenge die Karte
+// dort fest. Fuer die Fehlerkartei ist "Schwer" aber das Gegenteil eines
+// Erfolgs: es ist die Bewertung, mit der man sagt "die sitzt noch nicht".
+// Nur "Gut" und "Einfach" zaehlen hier, "Schwer" setzt zurueck wie "Nochmal".
+//
+// Bestandskarten ohne das Feld leiten ihren Wert aus earlyStep ab (und
+// ersatzweise aus totalReviews, wie earlyStep selbst): das ist genau der
+// Zaehler, an dem die Fehlerkartei vorher hing, also aendert die Einfuehrung
+// des Feldes an keiner vorhandenen Karte die Mitgliedschaft.
+export function erholungsStreak(card) {
+  if (Number.isFinite(card.recoveryStreak)) return card.recoveryStreak;
+  return Number.isFinite(card.earlyStep) ? card.earlyStep : (card.totalReviews || 0);
+}
+
 // ---------- FSRS-Kern ----------
 //
 // Was in das naechste Faelligkeitsdatum eingeht - alles davon steckt in den
@@ -146,12 +165,23 @@ export function rate(card, rating) {
   // werden: nur so kann "Nochmal" sie zuruecksetzen.
   const stufe = Number.isFinite(c.earlyStep) ? c.earlyStep : (c.totalReviews || 0);
   const fest = earlyInterval(stufe, rating);
+  // Vor dem Ueberschreiben von earlyStep lesen: Bestandskarten leiten ihre
+  // Straehne genau daraus ab (siehe erholungsStreak), und nach der Zuweisung
+  // unten waere das bereits der neue Wert.
+  const straehne = erholungsStreak(c);
 
   c.interval = fest != null ? fest : nextInterval(c.stability);
   // Vergessen wirft auf den Anfang der Leiter zurueck, jede erinnerte
   // Bewertung rueckt eine Stufe weiter. Ist die Leiter durch, bleibt der
   // Zaehler stehen und FSRS terminiert von hier an allein.
   c.earlyStep = rating === 'again' ? 0 : Math.min(EARLY_COUNT, stufe + 1);
+  // Getrennt davon die Erholungs-Straehne (siehe erholungsStreak): "Schwer"
+  // rueckt die Leiter weiter, setzt die Straehne aber zurueck. Gedeckelt wird
+  // nur, damit der Zaehler nicht endlos waechst - jede Schwelle, die ihn liest,
+  // liegt weit darunter.
+  c.recoveryStreak = (rating === 'good' || rating === 'easy')
+    ? Math.min(EARLY_COUNT, straehne + 1)
+    : 0;
 
   const due = new Date(today);
   due.setDate(due.getDate() + c.interval);
@@ -298,6 +328,8 @@ function baseCard() {
     // Stufe auf der festen Anfangsleiter (EARLY_STEPS). Bestandskarten ohne
     // dieses Feld leiten ihre Stufe aus totalReviews ab - siehe rate().
     earlyStep: 0,
+    // Sichere Bewertungen in Folge ("Gut"/"Einfach") - siehe erholungsStreak.
+    recoveryStreak: 0,
     createdAt: todayISO(), lastReviewed: null, totalReviews: 0, correct: 0, wrong: 0,
   };
 }

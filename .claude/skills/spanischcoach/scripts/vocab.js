@@ -161,6 +161,13 @@ function seedFromLegacy(card) {
   return { stability: Math.max(interval, STABILITY_MIN), difficulty };
 }
 
+// Sichere Bewertungen in Folge - gespiegelt aus src/lib/srs.js. "Schwer"
+// zaehlt hier NICHT als Erfolg, anders als bei earlyStep.
+function erholungsStreak(card) {
+  if (Number.isFinite(card.recoveryStreak)) return card.recoveryStreak;
+  return Number.isFinite(card.earlyStep) ? card.earlyStep : (card.totalReviews || 0);
+}
+
 // Identisch zur rate()-Funktion in src/lib/srs.js - bewusst dupliziert statt
 // importiert, damit die Skill ohne Build-Schritt als reines Node-Script
 // laeuft und unabhaengig von der React-App bleibt.
@@ -200,8 +207,16 @@ function rate(card, rating) {
   // weiter, uebersteuert ist nur die Wahl des Faelligkeitsdatums.
   const stufe = Number.isFinite(c.earlyStep) ? c.earlyStep : (c.totalReviews || 0);
   const fest = earlyInterval(stufe, rating);
+  const straehne = erholungsStreak(c);
   c.interval = fest != null ? fest : nextInterval(c.stability);
   c.earlyStep = rating === 'again' ? 0 : Math.min(EARLY_COUNT, stufe + 1);
+  // Erholungs-Straehne der Fehlerkartei - gespiegelt aus src/lib/srs.js. Wird
+  // hier zwar von keinem Befehl gelesen, muss aber mitgeschrieben werden: sonst
+  // stuende eine im Chat bewertete Karte in der App mit einer veralteten
+  // Straehne da und faele zu frueh oder zu spaet aus der Fehlerkartei.
+  c.recoveryStreak = (rating === 'good' || rating === 'easy')
+    ? Math.min(EARLY_COUNT, straehne + 1)
+    : 0;
 
   const due = new Date(today);
   due.setDate(due.getDate() + c.interval);
@@ -221,7 +236,7 @@ function newCard(fields) {
   return {
     id: uid(),
     ease: 2.5, interval: 0, repetitions: 0, dueDate: todayISO(),
-    stability: null, difficulty: null, earlyStep: 0,
+    stability: null, difficulty: null, earlyStep: 0, recoveryStreak: 0,
     createdAt: todayISO(), lastReviewed: null, totalReviews: 0, correct: 0, wrong: 0,
     updatedAt: new Date().toISOString(), deleted: false,
     ...fields,
