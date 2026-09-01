@@ -142,6 +142,17 @@ function nextInterval(S) {
   return Math.min(MAX_INTERVAL, Math.max(1, Math.round(raw)));
 }
 
+// Deckel fuer "Schwer" nach der Anfangsphase - gespiegelt aus src/lib/fsrs.js.
+// nextInterval() kennt nur die Stabilitaet, und die waechst auch bei "Schwer";
+// ohne den Deckel sprang eine muehsam erinnerte Karte von 140 auf 222 Tage.
+// Weicht der Faktor hier ab, terminiert dieselbe Karte im Chat anders als in
+// der App.
+const HARD_FAKTOR = 0.9;
+function hardInterval(vorherigesIntervall, S) {
+  const gedeckelt = Math.max(1, Math.round((vorherigesIntervall || 0) * HARD_FAKTOR));
+  return Math.min(nextInterval(S), gedeckelt);
+}
+
 // Abstand zweier Lerntage in KALENDERTAGEN - siehe daysBetween() in
 // src/lib/srs.js: die fruehere Rundung auf die Uhrzeit zaehlte nachmittags
 // jedes Mal einen Tag zu viel und blaehte die Intervalle auf.
@@ -208,7 +219,9 @@ function rate(card, rating) {
   const stufe = Number.isFinite(c.earlyStep) ? c.earlyStep : (c.totalReviews || 0);
   const fest = earlyInterval(stufe, rating);
   const straehne = erholungsStreak(c);
-  c.interval = fest != null ? fest : nextInterval(c.stability);
+  c.interval = fest != null
+    ? fest
+    : (rating === 'hard' ? hardInterval(c.interval, c.stability) : nextInterval(c.stability));
   c.earlyStep = rating === 'again' ? 0 : Math.min(EARLY_COUNT, stufe + 1);
   // Erholungs-Straehne der Fehlerkartei - gespiegelt aus src/lib/srs.js. Wird
   // hier zwar von keinem Befehl gelesen, muss aber mitgeschrieben werden: sonst

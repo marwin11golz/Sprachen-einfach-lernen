@@ -9,7 +9,7 @@
 import {
   RATING, initialStability, initialDifficulty, nextDifficulty,
   retrievability, nextStabilityRecall, nextStabilityForget, shortTermStability,
-  nextInterval, STABILITY_MIN,
+  nextInterval, hardInterval, STABILITY_MIN,
   earlyInterval, EARLY_COUNT,
 } from './fsrs.js';
 
@@ -170,7 +170,15 @@ export function rate(card, rating) {
   // unten waere das bereits der neue Wert.
   const straehne = erholungsStreak(c);
 
-  c.interval = fest != null ? fest : nextInterval(c.stability);
+  // Nach der Leiter kennt nextInterval() nur noch die Stabilitaet - die
+  // Bewertung selbst faellt dort aus der Terminierung heraus. Fuer "Schwer"
+  // ist das zu wenig: die Stabilitaet waechst auch dann, und eine muehsam
+  // erinnerte Karte sprang so weiter hinaus als beim letzten Mal (140 → 222
+  // Tage). hardInterval() deckelt das auf das letzte Intervall mal 1,2, siehe
+  // fsrs.js.
+  c.interval = fest != null
+    ? fest
+    : (rating === 'hard' ? hardInterval(c.interval, c.stability) : nextInterval(c.stability));
   // Vergessen wirft auf den Anfang der Leiter zurueck, jede erinnerte
   // Bewertung rueckt eine Stufe weiter. Ist die Leiter durch, bleibt der
   // Zaehler stehen und FSRS terminiert von hier an allein.
