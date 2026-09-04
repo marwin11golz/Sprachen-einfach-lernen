@@ -12,6 +12,7 @@ import {
   newVocabCard, newGapCard,
   VOCAB_PAIRS, SENTENCE_LANGS, langCodeOf,
 } from './lib/srs.js';
+import { erkenneSprache, erkenneVokabelPaar } from './lib/spracherkennung.js';
 import { RETENTION } from './lib/fsrs.js';
 import {
   THEMES, hexToRgba, SPACE, RADIUS, FONT, NAVBAR_H,
@@ -334,6 +335,18 @@ export default function VokabelTrainer() {
   const [pairIdx, setPairIdx] = useState(0);
   const [sentenceText, setSentenceText] = useState('');
   const [sentenceLangIdx, setSentenceLangIdx] = useState(0);
+  // Welche Sprache automatisch erkannt und eingestellt wurde - nur fuer den
+  // Hinweis unter dem Feld. Sichtbar MUSS es sein: ein stilles Umstellen waere
+  // derselbe unbemerkte Fehlgriff, den die Erkennung verhindern soll, nur mit
+  // umgekehrtem Vorzeichen.
+  const [pairErkannt, setPairErkannt] = useState(null);
+  const [sentenceErkannt, setSentenceErkannt] = useState(null);
+  // Sobald von Hand gewaehlt wird, haelt sich die Erkennung fuer diesen Block
+  // heraus - sonst ueberschriebe sie die ausdrueckliche Korrektur des Nutzers
+  // beim naechsten Tastendruck wieder. Zuruecksetzen tut das erst der naechste
+  // leere Block (siehe Effekt unten).
+  const [pairManuell, setPairManuell] = useState(false);
+  const [sentenceManuell, setSentenceManuell] = useState(false);
 
   const [studyMode, setStudyMode] = useState('classic');
   const [deckFilter, setDeckFilter] = useState(null);
@@ -420,25 +433,76 @@ export default function VokabelTrainer() {
   const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(null), 2200); };
 
   // --- Vokabeln hinzufügen ---
-  const handleAddVocab = () => {
-    const lines = addText.split('\n').map(l => l.trim()).filter(Boolean);
-    const pair = VOCAB_PAIRS[pairIdx];
-    const newCards = [];
-    for (const line of lines) {
-      let front, back;
-      if (line.includes('=')) {
-        const parts = line.split('=');
-        front = parts[0].trim(); back = parts.slice(1).join('=').trim();
-      } else if (line.includes(';')) {
-        const parts = line.split(';');
-        front = parts[0].trim(); back = parts.slice(1).join(';').trim();
-      } else if (line.includes(',')) {
-        const parts = line.split(',');
-        front = parts[0].trim(); back = parts.slice(1).join(',').trim();
-      } else continue;
-      if (!front || !back) continue;
-      newCards.push(newVocabCard({ front, back, langA: pair.a, langB: pair.b }));
+  // Zerlegt den eingefuegten Block in Vorder- und Rueckseite. Bewusst EINE
+  // Stelle, weil zwei Leser darauf sitzen: das Anlegen unten und die
+  // Spracherkennung. Trennten die beiden unterschiedlich, erkennte die eine
+  // Seite eine andere Sprache als die, die spaeter auf der Karte landet.
+  const vokabelZeilen = (text) => {
+    const out = [];
+    for (const line of text.split('\n').map(l => l.trim()).filter(Boolean)) {
+      // Reihenfolge ist Absicht: ein Komma steht oft im Beispielsatz, ein
+      // Gleichheitszeichen praktisch nie - also gewinnt das seltenere Zeichen.
+      const trenner = ['=', ';', ','].find(z => line.includes(z));
+      if (!trenner) continue;
+      const teile = line.split(trenner);
+      const front = teile[0].trim();
+      const back = teile.slice(1).join(trenner).trim();
+      if (front && back) out.push({ front, back });
     }
+    return out;
+  };
+
+  // Stellt das Sprachpaar nach dem eingefuegten Text ein.
+  //
+  // Entprellt wie die Suche in der Kartenliste: der Text aendert sich bei
+  // jedem Anschlag, die Erkennung braucht ihn aber erst, wenn er steht.
+  useEffect(() => {
+    const t = setTimeout(() => {
+      const paare = vokabelZeilen(addText);
+      if (paare.length === 0) {
+        // Leeres Feld heisst: naechster Block, naechste Chance - auch fuer die
+        // Erkennung, die sich nach einer Handauswahl herausgehalten hat.
+        setPairErkannt(null);
+        setPairManuell(false);
+        return;
+      }
+      if (pairManuell) return;
+      const treffer = erkenneVokabelPaar(paare);
+      if (!treffer) return;
+      const idx = VOCAB_PAIRS.findIndex(p => p.a === treffer.a && p.b === treffer.b);
+      // Stand es ohnehin schon richtig, gibt es nichts umzustellen und nichts
+      // zu sagen. Der Vergleich muss sein: ohne ihn setzte der Effekt nach dem
+      // eigenen Umstellen (pairIdx ist Abhaengigkeit, er laeuft also gleich
+      // noch einmal) den Hinweis sofort wieder zurueck - er blitzte nur auf.
+      if (idx === -1 || idx === pairIdx) return;
+      setPairIdx(idx);
+      setPairErkannt(VOCAB_PAIRS[idx].label);
+    }, 300);
+    return () => clearTimeout(t);
+  }, [addText, pairManuell, pairIdx]);
+
+  // Dasselbe fuer die Lueckensaetze - dort steht nur EINE Sprache im Feld,
+  // die Falle ist aber dieselbe.
+  useEffect(() => {
+    const t = setTimeout(() => {
+      const text = sentenceText.trim();
+      if (!text) { setSentenceErkannt(null); setSentenceManuell(false); return; }
+      if (sentenceManuell) return;
+      // Die eckigen Klammern markieren die Luecke und gehoeren nicht zum Satz.
+      const sprache = erkenneSprache(text.replace(/[[\]]/g, ' '));
+      if (!sprache) return;
+      const idx = SENTENCE_LANGS.indexOf(sprache);
+      if (idx === -1 || idx === sentenceLangIdx) return;
+      setSentenceLangIdx(idx);
+      setSentenceErkannt(sprache);
+    }, 300);
+    return () => clearTimeout(t);
+  }, [sentenceText, sentenceManuell, sentenceLangIdx]);
+
+  const handleAddVocab = () => {
+    const pair = VOCAB_PAIRS[pairIdx];
+    const newCards = vokabelZeilen(addText)
+      .map(({ front, back }) => newVocabCard({ front, back, langA: pair.a, langB: pair.b }));
     if (newCards.length === 0) { showToast('Keine gültigen Zeilen erkannt (Format: Wort = Übersetzung)'); return; }
     addCards(newCards);
     setAddText('');
@@ -1518,10 +1582,26 @@ export default function VokabelTrainer() {
             {addTab === 'vocab' && (
               <div style={{ maxWidth: 620 }}>
                 <label style={{ ...typoSecondary('sm'), color: T.textSecondary, display: 'block', marginBottom: SPACE.sm }}>Sprachpaar</label>
-                <select value={pairIdx} onChange={e => setPairIdx(Number(e.target.value))}
-                  style={{ ...inputStyle, maxWidth: 320, marginBottom: SPACE.lg, cursor: 'pointer' }}>
+                {/* Die Handauswahl bindet nur, wenn schon Text im Feld steht:
+                    dann hat der Nutzer den Block vor sich und widerspricht der
+                    Erkennung bewusst. Wer das Feld bei LEEREM Kasten vorstellt,
+                    tut genau das, was hier schiefgeht - er stellt auf gut Glueck
+                    ein und fuegt dann etwas anderes ein; da soll die Erkennung
+                    weiter korrigieren duerfen. Ohne diese Unterscheidung haenge
+                    das Verhalten daran, ob zwischen Auswahl und Einfuegen die
+                    300 ms des Entprellens vergangen sind. */}
+                <select value={pairIdx}
+                  onChange={e => { setPairIdx(Number(e.target.value)); setPairManuell(addText.trim().length > 0); setPairErkannt(null); }}
+                  style={{ ...inputStyle, maxWidth: 320, cursor: 'pointer' }}>
                   {VOCAB_PAIRS.map((p, i) => <option key={p.label} value={i}>{p.label}</option>)}
                 </select>
+                {/* In der normalen Textfarbe, nicht in Gruen: Gruen heisst in
+                    dieser App "jetzt handeln", und hier ist nichts zu tun -
+                    die Zeile sagt nur, was schon geschehen ist. */}
+                <div style={{ ...typoCaption(), color: T.textMuted, marginTop: SPACE.xs, minHeight: 16 }}>
+                  {pairErkannt ? `Sprache erkannt – auf „${pairErkannt}" gestellt` : ''}
+                </div>
+                <div style={{ height: SPACE.md }} />
 
                 <label style={{ ...typoSecondary('sm'), color: T.textSecondary, display: 'block', marginBottom: SPACE.sm }}>Vokabeln</label>
                 <textarea value={addText} onChange={e => setAddText(e.target.value)}
@@ -1541,10 +1621,15 @@ export default function VokabelTrainer() {
             {addTab === 'gap' && (
               <div style={{ maxWidth: 620 }}>
                 <label style={{ ...typoSecondary('sm'), color: T.textSecondary, display: 'block', marginBottom: SPACE.sm }}>Sprache</label>
-                <select value={sentenceLangIdx} onChange={e => setSentenceLangIdx(Number(e.target.value))}
-                  style={{ ...inputStyle, maxWidth: 320, marginBottom: SPACE.lg, cursor: 'pointer' }}>
+                <select value={sentenceLangIdx}
+                  onChange={e => { setSentenceLangIdx(Number(e.target.value)); setSentenceManuell(sentenceText.trim().length > 0); setSentenceErkannt(null); }}
+                  style={{ ...inputStyle, maxWidth: 320, cursor: 'pointer' }}>
                   {SENTENCE_LANGS.map(l => <option key={l} value={SENTENCE_LANGS.indexOf(l)}>{l}</option>)}
                 </select>
+                <div style={{ ...typoCaption(), color: T.textMuted, marginTop: SPACE.xs, minHeight: 16 }}>
+                  {sentenceErkannt ? `Sprache erkannt – auf „${sentenceErkannt}" gestellt` : ''}
+                </div>
+                <div style={{ height: SPACE.md }} />
 
                 <label style={{ ...typoSecondary('sm'), color: T.textSecondary, display: 'block', marginBottom: SPACE.sm }}>Sätze</label>
                 <textarea value={sentenceText} onChange={e => setSentenceText(e.target.value)}
