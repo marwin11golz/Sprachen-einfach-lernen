@@ -1,12 +1,13 @@
 // Besitzt den gesamten Vokabel-Zustand: Karten, Lernaktivität, Einstellungen.
 //
-// Nach außen gibt es bewusst KEIN rohes setCards, sondern nur die vier
-// Absichten addCards / rateCard / deleteCard / importData. Genau das
-// garantiert, dass jede Änderung ihren Zeitstempel bekommt - vergisst man das
-// an einer einzigen Stelle, gewinnt beim Abgleich später der falsche Stand.
+// Nach außen gibt es bewusst KEIN rohes setCards, sondern nur benannte
+// Absichten: addCards / rateCard / drillCard / deleteCard / importData. Genau
+// das garantiert, dass jede Änderung ihren Zeitstempel bekommt - vergisst man
+// das an einer einzigen Stelle, gewinnt beim Abgleich später der falsche
+// Stand.
 
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { rate, todayISO, rescheduleCard } from '../lib/srs.js';
+import { rate, drill, todayISO, rescheduleCard } from '../lib/srs.js';
 import { loadLocal, saveLocal, migrateCard } from '../lib/storage.js';
 import { mergeCards, combinedActivity, purgeOldTombstones } from '../lib/merge.js';
 
@@ -105,6 +106,18 @@ export function useVocabStore() {
     return updated;
   }, [logActivity, bump]);
 
+  // Bewertet eine Karte NUR fuer die Fehlerkartei (siehe drill() in srs.js):
+  // keine logActivity(), damit reines Drillen weder Tagesaktivitaet noch
+  // Streak aufblaeht - es ist ein Uebungsfeld, keine Lernsitzung.
+  const drillCard = useCallback((id, ratingKey) => {
+    const live = cardsRef.current.find(c => c.id === id);
+    if (!live) return null;
+    const updated = stamp(drill(live, ratingKey));
+    setAllCards(prev => prev.map(c => (c.id === id ? updated : c)));
+    bump();
+    return updated;
+  }, [bump]);
+
   // Löschen heißt: als gelöscht markieren, nicht entfernen. Nur so erfährt
   // das andere Gerät überhaupt davon.
   const deleteCard = useCallback((id) => {
@@ -168,6 +181,6 @@ export function useVocabStore() {
     prefsUpdatedAt, lastUserId, lastSyncAt,
     loaded, storageWarning,
     revision,
-    addCards, rateCard, deleteCard, deleteCards, importData, applyRemote,
+    addCards, rateCard, drillCard, deleteCard, deleteCards, importData, applyRemote,
   };
 }

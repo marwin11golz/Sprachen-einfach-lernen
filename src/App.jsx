@@ -318,7 +318,7 @@ export default function VokabelTrainer() {
     flipped, setFlipped,
     newCardsPerDay, setNewCardsPerDay,
     loaded, storageWarning,
-    addCards, rateCard, deleteCard, deleteCards, importData,
+    addCards, rateCard, drillCard, deleteCard, deleteCards, importData,
   } = store;
 
   const auth = useAuth();
@@ -556,8 +556,11 @@ export default function VokabelTrainer() {
   const startStudy = (key, label, onlyDue = true) => {
     const source = onlyDue ? dueCards : cards;
     // Die Fehlerkartei laesst sich nicht ueber deckKeyOf bilden - sie schneidet
-    // quer durch alle Sprachpaare. Nur die Auswahl des Stapels ist hier neu;
-    // Bewertung, Intervalle und Tageslimit bleiben unberuehrt.
+    // quer durch alle Sprachpaare. Die Auswahl des Stapels ist hier alles, was
+    // sich aendert: Tageslimit gilt unveraendert (onlyDue ist hier ohnehin
+    // false, siehe Aufruf unten), und wie bewertet wird, entscheidet
+    // submitRating anhand von deckFilter - fuer DECK_FEHLER laeuft das ueber
+    // drillCard() statt rateCard(), siehe dort.
     let pool = key === DECK_FEHLER
       ? source.filter(isDifficult)
       : key ? source.filter(c => deckKeyOf(c) === key) : source;
@@ -601,21 +604,36 @@ export default function VokabelTrainer() {
 
   const submitRating = (ratingKey) => {
     if (!current) return;
-    // Der Store bewertet die aktuell gespeicherte Karte, nicht die
-    // Momentaufnahme aus der Warteschlange, und zaehlt den Lerntag mit.
-    const updated = rateCard(current.id, ratingKey);
+    // Die Fehlerkartei ist reines Uebungsfeld (siehe drill() in srs.js): sie
+    // laeuft ueber drillCard() statt rateCard(), damit Drillen weder das
+    // echte Faelligkeitsdatum verschiebt noch Trefferquote/Wiederholungen
+    // veraendert - nur der Erholungs-Zaehler der Fehlerkartei bewegt sich.
+    // Ausserhalb der Fehlerkartei bewertet der Store wie immer die aktuell
+    // gespeicherte Karte, nicht die Momentaufnahme aus der Warteschlange, und
+    // zaehlt den Lerntag mit.
+    const istFehlerkartei = deckFilter === DECK_FEHLER;
+    const updated = istFehlerkartei
+      ? drillCard(current.id, ratingKey)
+      : rateCard(current.id, ratingKey);
     if (!updated) { setCurrent(null); return; }
     setSessionRatings(p => ({
       richtig: p.richtig + (ratingKey === 'again' ? 0 : 1),
       gesamt: p.gesamt + 1,
     }));
     let rest = queue.slice(1);
-    // Zurueck in die Warteschlange kommt, was heute noch einmal drankommen
-    // soll: eine vergessene Karte, und der Zehn-Minuten-Schritt der festen
-    // Anfangsphase (Intervall 0). Ein Datum kann keine zehn Minuten
-    // ausdruecken - dass die Karte in derselben Sitzung wiederkehrt, ist die
-    // Entsprechung dazu.
-    if (ratingKey === 'again' || updated.interval === 0) {
+    // Zurueck in die Warteschlange kommt, was jetzt gleich noch einmal
+    // drankommen soll. Im normalen Lernen zeigt das Intervall es an: eine
+    // vergessene Karte, oder der Zehn-Minuten-Schritt der festen Anfangsphase
+    // (Intervall 0) - ein Datum kann keine zehn Minuten ausdruecken, das
+    // Wiederkehren in derselben Sitzung ist die Entsprechung dazu. In der
+    // Fehlerkartei gibt es kein Intervall, das drillCard() aendern koennte;
+    // dort zeigt stattdessen die Bewertung selbst es an - "Schwer" setzt den
+    // Erholungs-Zaehler genau wie "Nochmal" zurueck und heisst: sitzt noch
+    // nicht, gleich nochmal.
+    const nochUnfertig = istFehlerkartei
+      ? (ratingKey === 'again' || ratingKey === 'hard')
+      : (ratingKey === 'again' || updated.interval === 0);
+    if (nochUnfertig) {
       const pos = Math.min(rest.length, 3);
       rest = [...rest.slice(0, pos), updated, ...rest.slice(pos)];
     }
