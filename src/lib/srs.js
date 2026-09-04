@@ -100,6 +100,29 @@ export function erholungsStreak(card) {
   return Number.isFinite(card.earlyStep) ? card.earlyStep : (card.totalReviews || 0);
 }
 
+// Bewertet eine Karte AUSSCHLIESSLICH fuer die Fehlerkartei - bewegt nur
+// recoveryStreak, sonst nichts. Im Unterschied zu rate() laesst das die
+// Terminierung (interval/dueDate/stability/difficulty/earlyStep) und die
+// Statistik (correct/wrong/totalReviews/repetitions) komplett unberuehrt.
+//
+// Grund: Die Fehlerkartei sollte ein freies Uebungsfeld sein, kein zweiter
+// Zufluss in denselben Zeitplan. Vorher lief das Ueben dort durch rate() -
+// zwei "Gut" in derselben Sitzung ruecken earlyStep zweimal vor und schieben
+// das echte Faelligkeitsdatum ebenso weit hinaus wie ein normaler, ueber Tage
+// verteilter Lernerfolg. Wer nur schnell drillen wollte, bekam so eine Karte,
+// die er kaum beherrschte, erst in einer Woche wieder zu sehen - der ganze
+// Sinn der Fehlerkartei war damit unterlaufen: Karten sollten "eigen" auf
+// wiederholtes Ueben reagieren, unabhaengig vom regulaeren Lernrhythmus.
+export function drill(card, rating) {
+  const c = { ...card };
+  // Vor dem Ueberschreiben lesen - dieselbe Reihenfolge wie in rate().
+  const straehne = erholungsStreak(c);
+  c.recoveryStreak = (rating === 'good' || rating === 'easy')
+    ? Math.min(EARLY_COUNT, straehne + 1)
+    : 0;
+  return c;
+}
+
 // ---------- FSRS-Kern ----------
 //
 // Was in das naechste Faelligkeitsdatum eingeht - alles davon steckt in den
