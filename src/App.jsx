@@ -335,12 +335,6 @@ export default function VokabelTrainer() {
   const [pairIdx, setPairIdx] = useState(0);
   const [sentenceText, setSentenceText] = useState('');
   const [sentenceLangIdx, setSentenceLangIdx] = useState(0);
-  // Welche Sprache automatisch erkannt und eingestellt wurde - nur fuer den
-  // Hinweis unter dem Feld. Sichtbar MUSS es sein: ein stilles Umstellen waere
-  // derselbe unbemerkte Fehlgriff, den die Erkennung verhindern soll, nur mit
-  // umgekehrtem Vorzeichen.
-  const [pairErkannt, setPairErkannt] = useState(null);
-  const [sentenceErkannt, setSentenceErkannt] = useState(null);
   // Sobald von Hand gewaehlt wird, haelt sich die Erkennung fuer diesen Block
   // heraus - sonst ueberschriebe sie die ausdrueckliche Korrektur des Nutzers
   // beim naechsten Tastendruck wieder. Zuruecksetzen tut das erst der naechste
@@ -462,7 +456,6 @@ export default function VokabelTrainer() {
       if (paare.length === 0) {
         // Leeres Feld heisst: naechster Block, naechste Chance - auch fuer die
         // Erkennung, die sich nach einer Handauswahl herausgehalten hat.
-        setPairErkannt(null);
         setPairManuell(false);
         return;
       }
@@ -470,13 +463,9 @@ export default function VokabelTrainer() {
       const treffer = erkenneVokabelPaar(paare);
       if (!treffer) return;
       const idx = VOCAB_PAIRS.findIndex(p => p.a === treffer.a && p.b === treffer.b);
-      // Stand es ohnehin schon richtig, gibt es nichts umzustellen und nichts
-      // zu sagen. Der Vergleich muss sein: ohne ihn setzte der Effekt nach dem
-      // eigenen Umstellen (pairIdx ist Abhaengigkeit, er laeuft also gleich
-      // noch einmal) den Hinweis sofort wieder zurueck - er blitzte nur auf.
+      // Stand es ohnehin schon richtig, gibt es nichts umzustellen.
       if (idx === -1 || idx === pairIdx) return;
       setPairIdx(idx);
-      setPairErkannt(VOCAB_PAIRS[idx].label);
     }, 300);
     return () => clearTimeout(t);
   }, [addText, pairManuell, pairIdx]);
@@ -486,7 +475,7 @@ export default function VokabelTrainer() {
   useEffect(() => {
     const t = setTimeout(() => {
       const text = sentenceText.trim();
-      if (!text) { setSentenceErkannt(null); setSentenceManuell(false); return; }
+      if (!text) { setSentenceManuell(false); return; }
       if (sentenceManuell) return;
       // Die eckigen Klammern markieren die Luecke und gehoeren nicht zum Satz.
       const sprache = erkenneSprache(text.replace(/[[\]]/g, ' '));
@@ -494,7 +483,6 @@ export default function VokabelTrainer() {
       const idx = SENTENCE_LANGS.indexOf(sprache);
       if (idx === -1 || idx === sentenceLangIdx) return;
       setSentenceLangIdx(idx);
-      setSentenceErkannt(sprache);
     }, 300);
     return () => clearTimeout(t);
   }, [sentenceText, sentenceManuell, sentenceLangIdx]);
@@ -1591,17 +1579,10 @@ export default function VokabelTrainer() {
                     das Verhalten daran, ob zwischen Auswahl und Einfuegen die
                     300 ms des Entprellens vergangen sind. */}
                 <select value={pairIdx}
-                  onChange={e => { setPairIdx(Number(e.target.value)); setPairManuell(addText.trim().length > 0); setPairErkannt(null); }}
-                  style={{ ...inputStyle, maxWidth: 320, cursor: 'pointer' }}>
+                  onChange={e => { setPairIdx(Number(e.target.value)); setPairManuell(addText.trim().length > 0); }}
+                  style={{ ...inputStyle, maxWidth: 320, marginBottom: SPACE.lg, cursor: 'pointer' }}>
                   {VOCAB_PAIRS.map((p, i) => <option key={p.label} value={i}>{p.label}</option>)}
                 </select>
-                {/* In der normalen Textfarbe, nicht in Gruen: Gruen heisst in
-                    dieser App "jetzt handeln", und hier ist nichts zu tun -
-                    die Zeile sagt nur, was schon geschehen ist. */}
-                <div style={{ ...typoCaption(), color: T.textMuted, marginTop: SPACE.xs, minHeight: 16 }}>
-                  {pairErkannt ? `Sprache erkannt – auf „${pairErkannt}" gestellt` : ''}
-                </div>
-                <div style={{ height: SPACE.md }} />
 
                 <label style={{ ...typoSecondary('sm'), color: T.textSecondary, display: 'block', marginBottom: SPACE.sm }}>Vokabeln</label>
                 <textarea value={addText} onChange={e => setAddText(e.target.value)}
@@ -1622,14 +1603,10 @@ export default function VokabelTrainer() {
               <div style={{ maxWidth: 620 }}>
                 <label style={{ ...typoSecondary('sm'), color: T.textSecondary, display: 'block', marginBottom: SPACE.sm }}>Sprache</label>
                 <select value={sentenceLangIdx}
-                  onChange={e => { setSentenceLangIdx(Number(e.target.value)); setSentenceManuell(sentenceText.trim().length > 0); setSentenceErkannt(null); }}
-                  style={{ ...inputStyle, maxWidth: 320, cursor: 'pointer' }}>
+                  onChange={e => { setSentenceLangIdx(Number(e.target.value)); setSentenceManuell(sentenceText.trim().length > 0); }}
+                  style={{ ...inputStyle, maxWidth: 320, marginBottom: SPACE.lg, cursor: 'pointer' }}>
                   {SENTENCE_LANGS.map(l => <option key={l} value={SENTENCE_LANGS.indexOf(l)}>{l}</option>)}
                 </select>
-                <div style={{ ...typoCaption(), color: T.textMuted, marginTop: SPACE.xs, minHeight: 16 }}>
-                  {sentenceErkannt ? `Sprache erkannt – auf „${sentenceErkannt}" gestellt` : ''}
-                </div>
-                <div style={{ height: SPACE.md }} />
 
                 <label style={{ ...typoSecondary('sm'), color: T.textSecondary, display: 'block', marginBottom: SPACE.sm }}>Sätze</label>
                 <textarea value={sentenceText} onChange={e => setSentenceText(e.target.value)}
