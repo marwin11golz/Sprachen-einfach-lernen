@@ -510,7 +510,9 @@ export default function VokabelTrainer() {
     if (newCards.length === 0) { showToast('Keine gültigen Zeilen erkannt (Wort in [eckigen Klammern] markieren)'); return; }
     addCards(newCards);
     setSentenceText('');
-    showToast(`${newCards.length} Satz${newCards.length > 1 ? 'sätze' : ''} hinzugefügt`);
+    // Ganzes Wort tauschen statt eine Endung anzuhaengen (wie beim Loeschen
+    // weiter unten): "Satz" + "sätze" ergab "3 Satzsätze".
+    showToast(`${newCards.length} ${newCards.length === 1 ? 'Satz' : 'Sätze'} hinzugefügt`);
   };
 
   const readFileInto = (e, setter) => {
