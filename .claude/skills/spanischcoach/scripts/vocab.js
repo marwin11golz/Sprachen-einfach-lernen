@@ -172,11 +172,18 @@ function seedFromLegacy(card) {
   return { stability: Math.max(interval, STABILITY_MIN), difficulty };
 }
 
-// Sichere Bewertungen in Folge - gespiegelt aus src/lib/srs.js. "Schwer"
-// zaehlt hier NICHT als Erfolg, anders als bei earlyStep.
+// Sichere Bewertungen in Folge - gespiegelt aus src/lib/srs.js. Hochgezaehlt
+// wird die Straehne nur im Fehlerkartei-Drill der App; hier wie dort kann eine
+// Bewertung sie nur zuruecksetzen oder festschreiben. Der Ersatzwert fuer
+// Bestandskarten ist zweiwertig - drinnen (0) oder erholt (die Schwelle) -,
+// weil earlyStep als Zahl mitwaechst und die Karte sonst zu frueh aus dem
+// Stapel faellt.
+const FEHLERKARTEI_ERHOLT = 3;
+
 function erholungsStreak(card) {
   if (Number.isFinite(card.recoveryStreak)) return card.recoveryStreak;
-  return Number.isFinite(card.earlyStep) ? card.earlyStep : (card.totalReviews || 0);
+  const stufe = Number.isFinite(card.earlyStep) ? card.earlyStep : (card.totalReviews || 0);
+  return stufe >= FEHLERKARTEI_ERHOLT ? FEHLERKARTEI_ERHOLT : 0;
 }
 
 // Identisch zur rate()-Funktion in src/lib/srs.js - bewusst dupliziert statt
@@ -226,10 +233,12 @@ function rate(card, rating) {
   // Erholungs-Straehne der Fehlerkartei - gespiegelt aus src/lib/srs.js. Wird
   // hier zwar von keinem Befehl gelesen, muss aber mitgeschrieben werden: sonst
   // stuende eine im Chat bewertete Karte in der App mit einer veralteten
-  // Straehne da und faele zu frueh oder zu spaet aus der Fehlerkartei.
-  c.recoveryStreak = (rating === 'good' || rating === 'easy')
-    ? Math.min(EARLY_COUNT, straehne + 1)
-    : 0;
+  // Straehne da und faele zu frueh oder zu spaet aus der Fehlerkartei. Bewertet
+  // wird im Chat immer regulaer, nie im Drill - also nur zuruecksetzen
+  // ("Nochmal"/"Schwer" holen die Karte in den Stapel zurueck) oder den Wert
+  // unveraendert festschreiben, damit der Ersatzwert nicht mit earlyStep
+  // weiterwaechst. Hochgezaehlt wird ausschliesslich in drill() in der App.
+  c.recoveryStreak = (rating === 'again' || rating === 'hard') ? 0 : straehne;
 
   const due = new Date(today);
   due.setDate(due.getDate() + c.interval);
