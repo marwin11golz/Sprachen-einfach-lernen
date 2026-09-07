@@ -81,23 +81,43 @@ function seedFromLegacy(card) {
   return { stability: Math.max(interval, STABILITY_MIN), difficulty };
 }
 
+// Ab wie vielen sicheren Bewertungen IN FOLGE eine einmal falsche Karte als
+// erholt gilt und aus der Fehlerkartei faellt.
+//
+// `wrong` selbst zaehlt bewusst nie zurueck (Lernfortschritt soll nicht
+// schrumpfen) - wuerde die Mitgliedschaft allein an `wrong > 0` haengen, waechst
+// der Stapel nur noch, ganz gleich wie oft eine Karte seither richtig war. Bei
+// laengerer Nutzung stuenden dort irgendwann hunderte laengst sitzende Karten,
+// und "wiederholen" waere witzlos.
+export const FEHLERKARTEI_ERHOLT = 3;
+
 // Wie viele Bewertungen IN FOLGE eine Karte zuletzt sicher sass - die Zahl,
 // an der die Fehlerkartei entscheidet, ob eine Karte sich erholt hat.
+//
+// Gezaehlt wird ausschliesslich im Fehlerkartei-Drill (drill()). Das normale
+// Lernen kann die Straehne nur auf 0 zuruecksetzen, also die Karte in den
+// Stapel zurueckholen - voranbringen kann es sie nicht. Der Weg hinaus fuehrt
+// nur ueber den Stapel selbst, sonst ist es nicht sein Algorithmus.
 //
 // Bewusst ein eigenes Feld und NICHT earlyStep, obwohl beide "seit dem letzten
 // Fehler" zaehlen: earlyStep waehlt das Faelligkeitsdatum auf der Anfangsleiter
 // und muss deshalb auch bei "Schwer" weiterruecken - sonst haenge die Karte
 // dort fest. Fuer die Fehlerkartei ist "Schwer" aber das Gegenteil eines
 // Erfolgs: es ist die Bewertung, mit der man sagt "die sitzt noch nicht".
-// Nur "Gut" und "Einfach" zaehlen hier, "Schwer" setzt zurueck wie "Nochmal".
 //
-// Bestandskarten ohne das Feld leiten ihren Wert aus earlyStep ab (und
-// ersatzweise aus totalReviews, wie earlyStep selbst): das ist genau der
-// Zaehler, an dem die Fehlerkartei vorher hing, also aendert die Einfuehrung
-// des Feldes an keiner vorhandenen Karte die Mitgliedschaft.
+// Bestandskarten ohne das Feld bekommen nur eine von zwei Antworten: drinnen
+// (0) oder erholt (die Schwelle). Der frueher hier zurueckgegebene earlyStep
+// haelt die Mitgliedschaft zwar zum Zeitpunkt der Einfuehrung richtig, ist als
+// Zahl aber unbrauchbar - er waechst mit jedem normalen Lernen weiter, und
+// drill() zaehlte von ihm aus hoch. Eine Bestandskarte mit earlyStep 2 fiel
+// deshalb schon nach EINEM "Gut" aus dem Stapel statt nach dreien. Zweiwertig
+// bleibt die heutige Zugehoerigkeit erhalten (wer mit earlyStep >= 3 draussen
+// war, bleibt draussen - kein Zustrom laengst sitzender Karten), und jede Karte
+// im Stapel hat wieder die vollen drei Durchgaenge vor sich.
 export function erholungsStreak(card) {
   if (Number.isFinite(card.recoveryStreak)) return card.recoveryStreak;
-  return Number.isFinite(card.earlyStep) ? card.earlyStep : (card.totalReviews || 0);
+  const stufe = Number.isFinite(card.earlyStep) ? card.earlyStep : (card.totalReviews || 0);
+  return stufe >= FEHLERKARTEI_ERHOLT ? FEHLERKARTEI_ERHOLT : 0;
 }
 
 // Bewertet eine Karte AUSSCHLIESSLICH fuer die Fehlerkartei - bewegt nur
@@ -206,13 +226,20 @@ export function rate(card, rating) {
   // Bewertung rueckt eine Stufe weiter. Ist die Leiter durch, bleibt der
   // Zaehler stehen und FSRS terminiert von hier an allein.
   c.earlyStep = rating === 'again' ? 0 : Math.min(EARLY_COUNT, stufe + 1);
-  // Getrennt davon die Erholungs-Straehne (siehe erholungsStreak): "Schwer"
-  // rueckt die Leiter weiter, setzt die Straehne aber zurueck. Gedeckelt wird
-  // nur, damit der Zaehler nicht endlos waechst - jede Schwelle, die ihn liest,
-  // liegt weit darunter.
-  c.recoveryStreak = (rating === 'good' || rating === 'easy')
-    ? Math.min(EARLY_COUNT, straehne + 1)
-    : 0;
+  // Getrennt davon die Erholungs-Straehne (siehe erholungsStreak). Sie gehoert
+  // der Fehlerkartei und wird nur dort hochgezaehlt - hier passieren nur die
+  // beiden Dinge, die das normale Lernen an ihr zu tun hat:
+  //
+  // Zuruecksetzen bei "Nochmal"/"Schwer" ist der EINGANG in die Fehlerkartei,
+  // nicht das Zaehlwerk: ohne das kaeme eine erholte Karte nach einer neuen
+  // Lapse nie mehr in den Stapel zurueck und er hoerte auf zu funktionieren.
+  //
+  // Festschreiben des unveraenderten Werts bei "Gut"/"Einfach" - statt gar
+  // nichts zu schreiben - haelt Bestandskarten fest: deren Ersatzwert haengt an
+  // earlyStep, und der rueckt eine Zeile hoeher weiter. Eine Karte mit
+  // earlyStep 2 fiele beim naechsten "Gut" auf 3 und damit lautlos aus dem
+  // Stapel, ohne je gedrillt worden zu sein.
+  c.recoveryStreak = (rating === 'again' || rating === 'hard') ? 0 : straehne;
 
   const due = new Date(today);
   due.setDate(due.getDate() + c.interval);

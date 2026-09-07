@@ -8,7 +8,7 @@ import {
 import {
   levenshtein, todayISO, cardSides, relativerTag,
   parseGapLine, revealSentence,
-  deckKeyOf, deckLabelOf, erholungsStreak,
+  deckKeyOf, deckLabelOf, erholungsStreak, FEHLERKARTEI_ERHOLT,
   newVocabCard, newGapCard,
   VOCAB_PAIRS, SENTENCE_LANGS, langCodeOf,
 } from './lib/srs.js';
@@ -32,24 +32,6 @@ import StreakCelebration from './ui/StreakCelebration.jsx';
 // sondern eine eigene Marke - der Stapel schneidet quer durch alle Sprachpaare.
 // Das Praefix kann mit keinem Sprachpaar kollidieren.
 const DECK_FEHLER = '__fehlerkartei';
-
-// Ab wie vielen erfolgreichen Bewertungen IN FOLGE seit dem letzten "Nochmal"
-// eine einmal falsche Karte als erholt gilt und aus der Fehlerkartei faellt.
-// `wrong` selbst zaehlt bewusst nie zurueck (Lernfortschritt soll nicht
-// schrumpfen) - wuerde die Mitgliedschaft allein an `wrong > 0` haengen, waechst
-// der Stapel nur noch, ganz gleich wie oft eine Karte seither richtig war. Bei
-// laengerer Nutzung stuenden dort irgendwann hunderte laengst sitzende Karten,
-// und "wiederholen" waere witzlos.
-//
-// Gezaehlt wird in `recoveryStreak` (siehe erholungsStreak in srs.js), und
-// zwar NUR "Gut" und "Einfach": "Schwer" setzt die Straehne zurueck wie ein
-// "Nochmal". Das ist die Bewertung, mit der man sagt "die sitzt noch nicht" -
-// eine Karte, die man dreimal muehsam hervorgekramt hat, ist genau die, die man
-// weiter ueben will, und sie hier zu entlassen waere das Gegenteil dessen,
-// wozu der Stapel da ist. Frueher hing das an `earlyStep`; der muss aber auch
-// bei "Schwer" weiterruecken, weil er das Faelligkeitsdatum auf der
-// Anfangsleiter waehlt - deshalb jetzt zwei Zaehler statt einem.
-const FEHLERKARTEI_ERHOLT = 3;
 
 // Zeilenhoehe der Kartenliste in Pixeln. Muss zum tatsaechlichen Layout
 // passen: das Fenster-Rendering (useFensterListe) stellt oben und unten
@@ -583,8 +565,9 @@ export default function VokabelTrainer() {
   const wochenSumme = useMemo(() => wochen.reduce((s, w) => s + w.count, 0), [wochen]);
 
   // Die Fehlerkartei ist ein Stapel wie jeder andere: sie sammelt automatisch,
-  // was schon einmal falsch war - und laesst wieder los, was sich seitdem
-  // erholt hat (siehe FEHLERKARTEI_ERHOLT oben).
+  // was schon einmal falsch war - und laesst wieder los, was sich seitdem im
+  // Stapel selbst erholt hat. Wie gezaehlt wird, steht bei erholungsStreak und
+  // FEHLERKARTEI_ERHOLT in srs.js; hochgezaehlt wird die Straehne nur im Drill.
   const isDifficult = (c) => (c.wrong || 0) > 0 && erholungsStreak(c) < FEHLERKARTEI_ERHOLT;
   const difficultDeck = useMemo(() => {
     const list = cards.filter(isDifficult)
