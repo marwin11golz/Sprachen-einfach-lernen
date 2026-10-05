@@ -888,28 +888,64 @@ export default function VokabelTrainer() {
   // Vorlesen in der Sprache der jeweiligen Kartenseite. Ohne gesetzte Sprache
   // nimmt der Browser die Standardstimme - ein englisches "future" klaenge
   // dann deutsch ausgesprochen.
+  //
+  // Der Ablauf hier ist an iOS entlang gebaut, wo die Sprachausgabe auf drei
+  // Arten lautlos scheitert, ohne irgendetwas zu melden:
+  //
+  //   1. cancel() unmittelbar vor speak() im selben Durchlauf laesst die
+  //      Ausgabe verstummen. Deshalb wird nur noch abgebrochen, wenn wirklich
+  //      etwas laeuft - sonst war der Aufruf ohnehin wirkungslos.
+  //   2. Nach dem Wegschalten der App bleibt die Ausgabe "pausiert" stehen.
+  //      resume() ist der Weg zurueck und schadet nie, wenn nichts pausiert.
+  //   3. speak() MUSS im Klick selbst stehen. Alles, was den Aufruf hinter
+  //      einen Timer oder ein await schiebt, verliert die Nutzergeste - also
+  //      wird hier nichts verzoegert.
+  //
+  // Und der Fehlerfall sagt jetzt Bescheid, statt still zu verschwinden: ein
+  // leeres catch hat genau die Meldung geschluckt, die erklaert haette, warum
+  // nichts zu hoeren ist.
   const speak = (text, langName) => {
+    const synth = window.speechSynthesis;
+    if (!text) return;
+    if (!synth || typeof SpeechSynthesisUtterance !== 'function') {
+      showToast('Dieser Browser kann nicht vorlesen.');
+      return;
+    }
     try {
-      const synth = window.speechSynthesis;
-      if (!synth || !text) return;
+      synth.resume();
+      if (synth.speaking || synth.pending) synth.cancel();
+
       const u = new SpeechSynthesisUtterance(text);
       const code = langCodeOf(langName);
       if (code) {
         u.lang = code;
+        // Stimmen frisch holen: die Liste fuellt der Browser nachtraeglich,
+        // und eine Referenz aus einer frueheren Sitzung schlaegt fehl. Der
+        // gemerkte Stand ist nur der Rueckfall.
+        const frisch = synth.getVoices?.() || [];
+        const voices = frisch.length ? frisch : voicesRef.current;
         // Einige Browser richten sich nur nach einer ausdruecklich gesetzten
         // Stimme und ignorieren u.lang. Erst die genaue Regionalstimme
         // versuchen (es-ES), sonst irgendeine der Sprache (es-MX).
         const base = code.slice(0, 2).toLowerCase();
-        const voices = voicesRef.current;
         const voice = voices.find(v => v.lang?.replace('_', '-').toLowerCase() === code.toLowerCase())
           || voices.find(v => v.lang?.replace('_', '-').toLowerCase().startsWith(base));
-        if (voice) u.voice = voice;
+        // Eigener Versuch: schlaegt das Zuweisen fehl, ist die Sprache ueber
+        // u.lang immer noch gesetzt - besser die Standardstimme als Stille.
+        if (voice) { try { u.voice = voice; } catch (e) { /* dann eben ohne */ } }
       }
-      // Ein noch laufender Satz wuerde den neuen sonst in die Warteschlange
-      // schieben, statt ihn sofort zu sprechen.
-      synth.cancel();
+      // "canceled"/"interrupted" sind der Normalfall, wenn man waehrend des
+      // Sprechens erneut tippt - nur echte Fehler sind eine Meldung wert.
+      u.onerror = (e) => {
+        const art = e?.error;
+        if (art && art !== 'canceled' && art !== 'interrupted') {
+          showToast('Vorlesen hat nicht geklappt – ist das Gerät stumm geschaltet?');
+        }
+      };
       synth.speak(u);
-    } catch (e) {}
+    } catch (e) {
+      showToast('Vorlesen hat nicht geklappt.');
+    }
   };
 
   const sessionDone = sessionTotal - queue.length;
