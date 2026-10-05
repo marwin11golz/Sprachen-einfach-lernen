@@ -936,10 +936,15 @@ export default function VokabelTrainer() {
       }
       // "canceled"/"interrupted" sind der Normalfall, wenn man waehrend des
       // Sprechens erneut tippt - nur echte Fehler sind eine Meldung wert.
+      //
+      // Bewusst OHNE Hinweis auf eine Stummschaltung: ein stummgeschaltetes
+      // iPhone spricht ganz normal, nur unhoerbar, und meldet gar nichts. Der
+      // Hinweis erschiene also ausgerechnet dort nie, wo er gemeint waere, und
+      // bei echten Fehlern zeigte er in die falsche Richtung.
       u.onerror = (e) => {
         const art = e?.error;
         if (art && art !== 'canceled' && art !== 'interrupted') {
-          showToast('Vorlesen hat nicht geklappt – ist das Gerät stumm geschaltet?');
+          showToast('Vorlesen hat nicht geklappt.');
         }
       };
       synth.speak(u);
