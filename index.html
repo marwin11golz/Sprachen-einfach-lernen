@@ -3,6 +3,10 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <!-- Faerbt den Bereich der Statusleiste (Uhrzeit, Akku). App.jsx zieht den
+         Wert zur Laufzeit auf das aktive Design nach - das Design ist in der App
+         umschaltbar und folgt nicht nur der Systemeinstellung, ein fester Wert
+         stuende also die Haelfte der Zeit falsch ueber der App. -->
     <meta name="theme-color" content="#040A0B" />
 
     <!-- iOS wertet das Manifest nicht aus. Erst diese Angaben machen aus dem
@@ -10,7 +14,11 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-title" content="Sprachen" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <!-- Bewusst "default" und nicht "black-translucent": letzteres zwingt die
+         Schrift der Statusleiste auf Weiss. Das passt zum dunklen Design und ist
+         im hellen unlesbar. Bei "default" faerbt iOS den Streifen nach
+         theme-color und waehlt die Schriftfarbe selbst passend dazu. -->
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <link rel="apple-touch-icon" href="/icons/apple-touch-icon-180.png" />
     <link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32.png" />
 
@@ -18,6 +26,16 @@
     <style>
       html, body, #root { height: 100%; margin: 0; }
       body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; }
+      /* Der Grund muss schon stehen, bevor React laeuft - sonst blitzt beim
+         Start das Weiss des Browsers auf, und zwar genau dort, wo es am
+         meisten stoert: hinter der Statusleiste. Die beiden Werte sind
+         THEMES.light.background und THEMES.dark.background aus theme.js;
+         aendern die sich, gehoeren sie hier mit nachgezogen. Sobald React
+         steht, uebernimmt der Umschalter in der App. */
+      html, body { background: #F5F7F5; }
+      @media (prefers-color-scheme: dark) {
+        html, body { background: #040A0B; }
+      }
     </style>
   </head>
   <body style="margin:0;">

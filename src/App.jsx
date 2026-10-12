@@ -394,6 +394,17 @@ export default function VokabelTrainer() {
     if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) setTheme('dark');
   }, []);
 
+  // Den Streifen der Statusleiste mitfaerben. iOS liest dafuer theme-color, und
+  // zwar laufend - der Wert muss also dem Umschalter folgen, sonst steht ueber
+  // der dunklen App ein helles Band. (Die Angabe
+  // apple-mobile-web-app-status-bar-style in index.html wird dagegen beim
+  // Hinzufuegen zum Home-Bildschirm einmalig uebernommen: aendert sie sich,
+  // hilft nur Symbol loeschen und neu hinzufuegen.)
+  useEffect(() => {
+    const meta = document.querySelector('meta[name="theme-color"]');
+    if (meta) meta.setAttribute('content', T.background);
+  }, [T.background]);
+
   // Die Stimmenliste laedt der Browser nachtraeglich - beim ersten Aufruf ist
   // sie meist noch leer. Deshalb einmal jetzt und erneut, sobald sie steht.
   const voicesRef = useRef([]);
@@ -940,6 +951,11 @@ export default function VokabelTrainer() {
   const globalCss = `
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
     * { box-sizing: border-box; }
+    /* Der Seitengrund gehoert auf html/body, nicht nur auf den Wurzel-Container.
+       Alles, was ausserhalb davon sichtbar wird - der Streifen hinter der
+       Statusleiste, das Nachfedern beim Ueberscrollen -, zeigt sonst das Weiss
+       des Browsers, und zwar ausgerechnet im dunklen Design. */
+    html, body { background: ${T.background}; }
     body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Inter, sans-serif; }
     /* Fuer Kennzahlen bewusst NICHT IBM Plex Mono: deren Null traegt einen
        fest ins Zeichen eingebackenen Punkt in der Mitte (kein Schrift-Feature
