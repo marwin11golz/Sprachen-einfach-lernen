@@ -1565,7 +1565,7 @@ export default function VokabelTrainer() {
                     300 ms des Entprellens vergangen sind. */}
                 <select value={pairIdx}
                   onChange={e => { setPairIdx(Number(e.target.value)); setPairManuell(addText.trim().length > 0); }}
-                  style={{ ...inputStyle, maxWidth: 320, marginBottom: SPACE.lg, cursor: 'pointer' }}>
+                  style={{ ...inputStyle, marginBottom: SPACE.lg, cursor: 'pointer' }}>
                   {VOCAB_PAIRS.map((p, i) => <option key={p.label} value={i}>{p.label}</option>)}
                 </select>
 
@@ -1589,7 +1589,7 @@ export default function VokabelTrainer() {
                 <label style={{ ...typoSecondary('sm'), color: T.textSecondary, display: 'block', marginBottom: SPACE.sm }}>Sprache</label>
                 <select value={sentenceLangIdx}
                   onChange={e => { setSentenceLangIdx(Number(e.target.value)); setSentenceManuell(sentenceText.trim().length > 0); }}
-                  style={{ ...inputStyle, maxWidth: 320, marginBottom: SPACE.lg, cursor: 'pointer' }}>
+                  style={{ ...inputStyle, marginBottom: SPACE.lg, cursor: 'pointer' }}>
                   {SENTENCE_LANGS.map(l => <option key={l} value={SENTENCE_LANGS.indexOf(l)}>{l}</option>)}
                 </select>
 
