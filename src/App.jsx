@@ -9,6 +9,7 @@ import {
   levenshtein, todayISO, cardSides, relativerTag,
   parseGapLine, revealSentence,
   deckKeyOf, deckLabelOf, erholungsStreak, FEHLERKARTEI_ERHOLT,
+  FEHLERKARTEI_PRO_TAG, tagGeschlossen, drillHeute,
   newVocabCard, newGapCard,
   VOCAB_PAIRS, SENTENCE_LANGS, langCodeOf,
 } from './lib/srs.js';
@@ -154,10 +155,12 @@ function KartenZeile({ T, card, auswahlModus, markiert, onMarkieren, onLoeschen 
 // Eine Stapelzeile: Name, Kartenzahl, Lernstand, Hauptaktion - in dieser
 // Rangfolge. Kartenboxen und Fehlerkartei teilen sie sich, damit die
 // Fehlerkartei sich wie ein Stapel anfuehlt und nicht wie ein Sonderfall.
-function DeckZeile({ T, icon, name, anzahl, neu, faellig, onLernen, lernbar, trenner }) {
+function DeckZeile({ T, icon, name, anzahl, neu, faellig, onLernen, lernbar, trenner, hinweis }) {
   // Jeder Wert steht fuer sich. Ist nichts faellig, sagt die Zeile das auch -
   // vorher verschwand die Angabe wortlos und die Zeile wirkte unvollstaendig.
-  const werte = [
+  // `hinweis` ersetzt die Werte ganz: fuer einen Stapel, der gerade nichts zu
+  // tun gibt, ist "0 Karten" keine Auskunft, sondern eine Irrefuehrung.
+  const werte = hinweis ? [{ text: hinweis, ton: 'neutral' }] : [
     { text: `${anzahl} ${anzahl === 1 ? 'Karte' : 'Karten'}`, ton: 'neutral' },
     ...(neu > 0 ? [{ text: `${neu} neu`, ton: 'neutral' }] : []),
     faellig > 0
@@ -577,13 +580,23 @@ export default function VokabelTrainer() {
 
   // Die Fehlerkartei ist ein Stapel wie jeder andere: sie sammelt automatisch,
   // was schon einmal falsch war - und laesst wieder los, was sich seitdem im
-  // Stapel selbst erholt hat. Wie gezaehlt wird, steht bei erholungsStreak und
-  // FEHLERKARTEI_ERHOLT in srs.js; hochgezaehlt wird die Straehne nur im Drill.
-  const isDifficult = (c) => (c.wrong || 0) > 0 && erholungsStreak(c) < FEHLERKARTEI_ERHOLT;
+  // Stapel selbst erholt hat. Wie gezaehlt wird, steht bei erholungsStreak,
+  // FEHLERKARTEI_ERHOLT und FEHLERKARTEI_PRO_TAG in srs.js.
+  //
+  // Sie kennt ZWEI Arten von "nicht mehr hier": erholt (endgueltig, ueber drei
+  // Tage) und fuer heute geschafft (das Tagespensum sitzt, morgen wieder).
+  // Beides nimmt die Karte aus dem Stapel - nur sagt das Dashboard etwas
+  // anderes dazu, siehe unten.
+  const istFehlerkarte = (c) => (c.wrong || 0) > 0 && erholungsStreak(c) < FEHLERKARTEI_ERHOLT;
+  const isDifficult = (c) => istFehlerkarte(c) && !tagGeschlossen(c);
   const difficultDeck = useMemo(() => {
     const list = cards.filter(isDifficult)
       .sort((a, b) => (b.wrong / (b.totalReviews || 1)) - (a.wrong / (a.totalReviews || 1)));
-    return { total: list.length, due: list.filter(c => c.dueDate <= todayISO()).length };
+    return {
+      total: list.length,
+      due: list.filter(c => c.dueDate <= todayISO()).length,
+      heuteGeschafft: cards.filter(c => istFehlerkarte(c) && tagGeschlossen(c)).length,
+    };
   }, [cards]);
 
   // Kartenboxen ("Decks") wie in Anki
@@ -675,11 +688,13 @@ export default function VokabelTrainer() {
     // (Intervall 0) - ein Datum kann keine zehn Minuten ausdruecken, das
     // Wiederkehren in derselben Sitzung ist die Entsprechung dazu. In der
     // Fehlerkartei gibt es kein Intervall, das drillCard() aendern koennte;
-    // dort zeigt stattdessen die Bewertung selbst es an - "Schwer" setzt den
-    // Erholungs-Zaehler genau wie "Nochmal" zurueck und heisst: sitzt noch
-    // nicht, gleich nochmal.
+    // dort entscheidet das Tagespensum: Die Karte kommt wieder, bis sie heute
+    // ihre drei sicheren Durchgaenge hat. Das gilt auch nach "Gut" - sonst
+    // kaeme sie pro Sitzung nur einmal dran und die drei waeren gar nicht zu
+    // erreichen. "Nochmal"/"Schwer" setzen den Tag auf null zurueck und sind
+    // damit automatisch mit abgedeckt.
     const nochUnfertig = istFehlerkartei
-      ? (ratingKey === 'again' || ratingKey === 'hard')
+      ? !tagGeschlossen(updated)
       : (ratingKey === 'again' || updated.interval === 0);
     if (nochUnfertig) {
       const pos = Math.min(rest.length, 3);
@@ -1098,6 +1113,19 @@ export default function VokabelTrainer() {
           <div style={{ height: 5, borderRadius: RADIUS.pill, background: T.surfaceElevated, overflow: 'hidden' }}>
             <div style={{ height: '100%', width: `${sessionProgress}%`, background: T.primary, borderRadius: RADIUS.pill, transition: 'width .3s ease' }} />
           </div>
+          {/* Nur im Drill: wo diese Karte in den zwei Stufen der Fehlerkartei
+              steht. Ohne die Zeile passiert beim zweiten Durchgang desselben
+              Tages sichtbar NICHTS - die Regel waere nicht zu erkennen und die
+              App saehe kaputt aus. Kein Verstoss gegen "keine Intervallzahlen
+              in der Oberflaeche": das hier ist kein Faelligkeitsabstand,
+              sondern der Stand der eigenen Regel dieses Stapels. */}
+          {deckFilter === DECK_FEHLER && current && (
+            <div style={{ ...typoCaption(), color: T.textSecondary, textAlign: 'center', marginTop: SPACE.sm }}>
+              Heute {drillHeute(current)} von {FEHLERKARTEI_PRO_TAG}
+              {' · '}
+              Tag {Math.min(erholungsStreak(current) + 1, FEHLERKARTEI_ERHOLT)} von {FEHLERKARTEI_ERHOLT}
+            </div>
+          )}
         </div>
 
         {!current ? (
@@ -1512,14 +1540,20 @@ export default function VokabelTrainer() {
                 ))}
                 {/* Dieselbe Zeilenform wie ein Deck - nur die Form des Symbols sagt,
                     dass sich dieser Stapel von selbst fuellt. */}
-                {difficultDeck.total > 0 && (
+                {(difficultDeck.total > 0 || difficultDeck.heuteGeschafft > 0) && (
                   <DeckZeile
                     T={T} trenner={decks.length > 0}
                     icon={<AlertTriangle size={18} strokeWidth={1.5} color={T.primary} />}
                     name="Fehlerkartei"
                     anzahl={difficultDeck.total}
                     faellig={difficultDeck.due}
-                    lernbar
+                    // Alles fuer heute geschafft, aber noch nicht erholt: Die
+                    // Zeile bleibt stehen und sagt, dass es weitergeht. Liesse
+                    // man sie verschwinden, laese sich das als "endgueltig
+                    // weg" - genau die Verwechslung, wegen der das Tagespensum
+                    // ueberhaupt eingefuehrt wurde.
+                    hinweis={difficultDeck.total === 0 ? 'heute geschafft – morgen wieder' : undefined}
+                    lernbar={difficultDeck.total > 0}
                     onLernen={() => startStudy(DECK_FEHLER, 'Fehlerkartei', false)}
                   />
                 )}

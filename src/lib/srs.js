@@ -91,6 +91,21 @@ function seedFromLegacy(card) {
 // und "wiederholen" waere witzlos.
 export const FEHLERKARTEI_ERHOLT = 3;
 
+// Wie viele richtige Durchgaenge einen TAG abschliessen. Dieselbe Zahl wie
+// oben und trotzdem etwas voellig anderes - die beiden gehoeren zu den zwei
+// Stufen der Fehlerkartei, und wer sie zusammenzieht, baut genau den Fehler
+// wieder ein, den diese Trennung behebt:
+//
+//   FEHLERKARTEI_PRO_TAG  Durchgaenge, bis die Karte HEUTE ruht
+//   FEHLERKARTEI_ERHOLT   solche Tage, bis sie ENDGUELTIG draussen ist
+//
+// Vorher gab es nur eine Stufe, und sie zaehlte Bewertungen ohne Ruecksicht
+// auf das Datum: drei "Gut" in einer Sitzung, und die Karte war fuer immer
+// weg. Dreimal richtig innerhalb weniger Minuten belegt aber das
+// Kurzzeitgedaechtnis, nicht das Behalten - der Stapel entliess seine Karten
+// also ausgerechnet auf den truegerischsten Beleg hin.
+export const FEHLERKARTEI_PRO_TAG = 3;
+
 // Wie viele Bewertungen IN FOLGE eine Karte zuletzt sicher sass - die Zahl,
 // an der die Fehlerkartei entscheidet, ob eine Karte sich erholt hat.
 //
@@ -120,6 +135,21 @@ export function erholungsStreak(card) {
   return stufe >= FEHLERKARTEI_ERHOLT ? FEHLERKARTEI_ERHOLT : 0;
 }
 
+// Wie viele der heutigen Durchgaenge schon sitzen (0 ... FEHLERKARTEI_PRO_TAG).
+// Der Zaehler gehoert immer genau einem Tag: steht an der Karte ein anderes
+// Datum, faengt heute bei null an. Deshalb braucht es kein naechtliches
+// Aufraeumen - der Tageswechsel erledigt sich beim Lesen.
+export function drillHeute(card, heute = todayISO()) {
+  if (!card || card.recoveryDay !== heute) return 0;
+  return Math.min(FEHLERKARTEI_PRO_TAG, card.recoveryToday || 0);
+}
+
+// Tagespensum erfuellt? Dann ruht die Karte bis morgen - sie faellt aus der
+// Fehlerkartei, ohne schon erholt zu sein.
+export function tagGeschlossen(card, heute = todayISO()) {
+  return drillHeute(card, heute) >= FEHLERKARTEI_PRO_TAG;
+}
+
 // Bewertet eine Karte AUSSCHLIESSLICH fuer die Fehlerkartei - bewegt nur
 // recoveryStreak, sonst nichts. Im Unterschied zu rate() laesst das die
 // Terminierung (interval/dueDate/stability/difficulty/earlyStep) und die
@@ -133,13 +163,35 @@ export function erholungsStreak(card) {
 // die er kaum beherrschte, erst in einer Woche wieder zu sehen - der ganze
 // Sinn der Fehlerkartei war damit unterlaufen: Karten sollten "eigen" auf
 // wiederholtes Ueben reagieren, unabhaengig vom regulaeren Lernrhythmus.
-export function drill(card, rating) {
+export function drill(card, rating, heute = todayISO()) {
   const c = { ...card };
-  // Vor dem Ueberschreiben lesen - dieselbe Reihenfolge wie in rate().
-  const straehne = erholungsStreak(c);
-  c.recoveryStreak = (rating === 'good' || rating === 'easy')
-    ? Math.min(EARLY_COUNT, straehne + 1)
-    : 0;
+  const sicher = rating === 'good' || rating === 'easy';
+
+  if (!sicher) {
+    // "Nochmal"/"Schwer" heisst: sitzt noch nicht. Der laufende Tag faellt
+    // zurueck auf null UND die Tagesstraehne ebenso - sonst waere eine Karte,
+    // die man am dritten Tag wieder vergisst, trotzdem erholt.
+    c.recoveryStreak = 0;
+    c.recoveryToday = 0;
+    c.recoveryDay = null;
+    return c;
+  }
+
+  // Ist das Tagespensum schon erfuellt, aendert Weiteruben nichts mehr. Ohne
+  // diese Abfrage liefe der Tageszaehler weiter und schriebe bei jedem dritten
+  // "Gut" einen weiteren TAG gut - der alte Fehler waere zurueck, nur drei
+  // Bewertungen spaeter. Geuebt werden darf trotzdem beliebig oft; es zaehlt
+  // nur nicht erneut.
+  if (tagGeschlossen(c, heute)) return c;
+
+  const stand = drillHeute(c, heute) + 1;
+  c.recoveryDay = heute;
+  c.recoveryToday = stand;
+  // Erst der letzte Durchgang des Tages bewegt die Straehne - sie zaehlt
+  // abgeschlossene TAGE, nicht Bewertungen.
+  if (stand >= FEHLERKARTEI_PRO_TAG) {
+    c.recoveryStreak = Math.min(FEHLERKARTEI_ERHOLT, erholungsStreak(c) + 1);
+  }
   return c;
 }
 
@@ -240,6 +292,13 @@ export function rate(card, rating) {
   // earlyStep 2 fiele beim naechsten "Gut" auf 3 und damit lautlos aus dem
   // Stapel, ohne je gedrillt worden zu sein.
   c.recoveryStreak = (rating === 'again' || rating === 'hard') ? 0 : straehne;
+  // Der angefangene Tag faellt mit zurueck. Ohne das traegt eine Karte, die
+  // gerade erst in den Stapel zurueckgefallen ist, noch ihr abgeschlossenes
+  // Tagespensum von heute - und waere ausgerechnet heute nicht mehr uebbar.
+  if (rating === 'again' || rating === 'hard') {
+    c.recoveryToday = 0;
+    c.recoveryDay = null;
+  }
 
   const due = new Date(today);
   due.setDate(due.getDate() + c.interval);
@@ -386,8 +445,10 @@ function baseCard() {
     // Stufe auf der festen Anfangsleiter (EARLY_STEPS). Bestandskarten ohne
     // dieses Feld leiten ihre Stufe aus totalReviews ab - siehe rate().
     earlyStep: 0,
-    // Sichere Bewertungen in Folge ("Gut"/"Einfach") - siehe erholungsStreak.
+    // Abgeschlossene Tage der Fehlerkartei - siehe erholungsStreak.
     recoveryStreak: 0,
+    // Der laufende Tag darin: welches Datum und wie weit - siehe drillHeute.
+    recoveryToday: 0, recoveryDay: null,
     createdAt: todayISO(), lastReviewed: null, totalReviews: 0, correct: 0, wrong: 0,
   };
 }

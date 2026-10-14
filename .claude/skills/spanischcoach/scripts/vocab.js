@@ -179,6 +179,12 @@ function seedFromLegacy(card) {
 // weil earlyStep als Zahl mitwaechst und die Karte sonst zu frueh aus dem
 // Stapel faellt.
 const FEHLERKARTEI_ERHOLT = 3;
+// Durchgaenge, die einen TAG abschliessen. Die Fehlerkartei hat zwei Stufen:
+// FEHLERKARTEI_PRO_TAG Durchgaenge lassen die Karte fuer heute ruhen,
+// FEHLERKARTEI_ERHOLT solcher Tage lassen sie endgueltig los. Gedrillt wird
+// nur in der App - hier steht der Wert, damit beide Seiten dieselbe Regel
+// kennen, wenn eine Karte zwischen Chat und App wandert.
+const FEHLERKARTEI_PRO_TAG = 3;
 
 function erholungsStreak(card) {
   if (Number.isFinite(card.recoveryStreak)) return card.recoveryStreak;
@@ -239,6 +245,14 @@ function rate(card, rating) {
   // unveraendert festschreiben, damit der Ersatzwert nicht mit earlyStep
   // weiterwaechst. Hochgezaehlt wird ausschliesslich in drill() in der App.
   c.recoveryStreak = (rating === 'again' || rating === 'hard') ? 0 : straehne;
+  // Der angefangene Tag faellt mit zurueck - genau wie in rate() der App.
+  // Ohne das kaeme eine Karte, die im Chat gerade in den Stapel
+  // zurueckgefallen ist, mit einem abgeschlossenen Tagespensum in der App an
+  // und waere dort ausgerechnet heute nicht uebbar.
+  if (rating === 'again' || rating === 'hard') {
+    c.recoveryToday = 0;
+    c.recoveryDay = null;
+  }
 
   const due = new Date(today);
   due.setDate(due.getDate() + c.interval);
@@ -258,7 +272,8 @@ function newCard(fields) {
   return {
     id: uid(),
     ease: 2.5, interval: 0, repetitions: 0, dueDate: todayISO(),
-    stability: null, difficulty: null, earlyStep: 0, recoveryStreak: 0,
+    stability: null, difficulty: null, earlyStep: 0,
+    recoveryStreak: 0, recoveryToday: 0, recoveryDay: null,
     createdAt: todayISO(), lastReviewed: null, totalReviews: 0, correct: 0, wrong: 0,
     updatedAt: new Date().toISOString(), deleted: false,
     ...fields,
