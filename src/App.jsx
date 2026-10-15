@@ -981,6 +981,12 @@ export default function VokabelTrainer() {
     button { font-family: inherit; }
     ::selection { background: ${T.primarySoft}; }
     input, textarea, select { font-family: inherit; }
+    /* Der Platzhalter ist die eine Stelle, die absichtlich gedaempft bleibt:
+       Er ist ein Hinweis, kein Inhalt, und saehe in der Farbe der Schrift aus
+       wie bereits Eingetipptes. Vorher kam er vom Browser und war damit
+       undefiniert; borderStrong ist der Ton, der beim Aufhellen der
+       Nebenschrift bewusst zurueckgeblieben ist. */
+    ::placeholder { color: ${T.borderStrong}; opacity: 1; }
     input:focus, textarea:focus, select:focus { border-color: ${T.primary}; }
     ::-webkit-scrollbar { height: 8px; width: 8px; }
     ::-webkit-scrollbar-thumb { background: ${T.border}; border-radius: 4px; }

@@ -49,6 +49,7 @@ export const NAVBAR_H = 84;
 //   primaryInk       Schrift AUF primary
 //   textPrimary/-Secondary/-Muted   drei Stufen Lesbarkeit
 //   border           Rand von Eingabefeldern und Knoepfen
+//   borderStrong     Rand OHNE Flaeche dahinter (btnOutline)
 //   hairline         Trennlinie zwischen Zeilen und Abschnitten
 //   success/warning/error (+ …Soft)  Rueckmeldung
 //
@@ -58,11 +59,16 @@ export const NAVBAR_H = 84;
 export const THEMES = {
   light: {
     background: '#F5F7F5', surface: '#FBFCFB', surfaceElevated: '#FFFFFF',
-    textPrimary: '#111714', textSecondary: '#5C665F', textMuted: '#838D86',
+    // Die beiden Nebenstufen stehen bewusst dicht an der Hauptschrift: Sie
+    // tragen die kleinsten Groessen (FONT.xs, 11 px), und dort kostet jeder
+    // Schritt ins Graue sofort Lesbarkeit. Im hellen Design heisst "kraeftiger"
+    // dunkler, im dunklen heller - dasselbe Ziel, entgegengesetzte Richtung.
+    textPrimary: '#111714', textSecondary: '#2E3733', textMuted: '#3A433E',
     // border traegt die Raender von Eingabefeldern und Knoepfen - dort ist ein
     // sichtbarer Rand eine Bedienhilfe. hairline traegt Trennlinien zwischen
-    // Zeilen und Abschnitten und ist deutlich schwaecher.
-    border: '#DFE5E0', hairline: '#ECEFEA',
+    // Zeilen und Abschnitten und ist deutlich schwaecher. borderStrong steht
+    // allein (siehe btnOutline) und darf deshalb nicht mit der Schrift wandern.
+    border: '#DFE5E0', borderStrong: '#838D86', hairline: '#ECEFEA',
     // Im hellen Design bestimmt nicht der Seitengrund die noetige Tiefe, sondern
     // die weiche Flaeche der Bewertungsknoepfe: darauf steht die Beschriftung im
     // selben Ton. Diese Werte tragen beides - weisse Schrift auf der vollen
@@ -80,10 +86,23 @@ export const THEMES = {
     // darueber und unterscheiden sich nur um wenige Stufen.
     background: '#040A0B', surface: '#0D1213', surfaceElevated: '#101718',
     // Neutral bis leicht kuehl, kein warmes Weiss - so steht es in der Vorlage.
-    // Der Sekundaerton dort ist #696F70 und erreicht nur 3.9:1; er waere auf
-    // diesem Grund nicht mehr lesbar, deshalb hier eine Stufe heller.
-    textPrimary: '#F1F2F2', textSecondary: '#828A8B', textMuted: '#646C6D',
-    border: '#1B2223', hairline: '#141A1B',
+    // Deren Sekundaerton (#696F70) erreicht nur 3.9:1 und waere auf diesem Grund
+    // nicht lesbar. Die beiden Nebenstufen liegen jetzt deutlich darueber und
+    // dicht an der Hauptschrift: Sie tragen die kleinsten Groessen (FONT.xs,
+    // 11 px) - "in den letzten 12 Wochen", die Einheiten neben den Kennzahlen,
+    // die Spalten der Kartenliste -, und genau dort faellt jeder Schritt ins
+    // Graue am staerksten ins Gewicht. textSecondary (16.5:1) wird als Weiss
+    // gelesen; der verbleibende Hauch Abstand zu textPrimary ist Absicht, sonst
+    // laege "Streak" optisch gleichauf mit "54" und der Blick faende keinen
+    // Anfang mehr. Spuerbar, nicht sichtbar.
+    //
+    // textMuted liegt aus demselben Grund nur noch knapp darunter (14.1:1).
+    // Ein erster Versuch liess es bei #B0B6B6 - rechnerisch mit 9.7:1 voellig
+    // in Ordnung, im Bild aber weiterhin erkennbar grau, und "in den letzten
+    // 12 Wochen" war genau die Zeile, um die es ging. Die Zahl allein
+    // entscheidet das hier nicht.
+    textPrimary: '#F1F2F2', textSecondary: '#E8EAEA', textMuted: '#D6DADA',
+    border: '#1B2223', borderStrong: '#646C6D', hairline: '#141A1B',
     // Der Akzent traegt keine weisse Schrift - darauf gehoert dunkle (primaryInk).
     primary: '#29C08B', primarySoft: '#0E3829', primaryInk: '#04140D',
     // Die getoenten Flaechen der Bewertung stammen ebenfalls aus der Vorlage.
@@ -124,13 +143,20 @@ export function btnSecondary(T, size = 'md') {
 // eine die Hauptaktion sein darf - die "Lernen"-Knoepfe der Kartenboxen neben
 // dem einen gefuellten "Lernen starten". btnSecondary traegt dafuer zu viel
 // Gewicht: eine eigene Flaeche liest sich wie eine zweite Hauptaktion.
-// Der Rand traegt hier T.textMuted statt T.border: T.border sitzt sonst immer vor
-// einer eigenen Flaeche und darf deshalb schwach sein (dunkel 1.17:1). Ohne
-// Flaeche waere der Knopf damit praktisch unsichtbar - T.textMuted erreicht in
-// beiden Designs ueber 3:1 gegen Behaelter und Seitengrund.
+// Der Rand traegt hier T.borderStrong statt T.border: T.border sitzt sonst immer
+// vor einer eigenen Flaeche und darf deshalb schwach sein (dunkel 1.17:1). Ohne
+// Flaeche waere der Knopf damit praktisch unsichtbar - T.borderStrong erreicht
+// in beiden Designs ueber 3:1 gegen Behaelter und Seitengrund.
+//
+// Eigener Token und nicht mehr T.textMuted, obwohl die Werte dieselben sind:
+// Als die Nebenschrift aufgehellt wurde, haette ein geteilter Token diese
+// Raender mit aufleuchten lassen - zwei gleich laute Knoepfe neben der einen
+// gefuellten Hauptaktion, und der Bildschirm verliert seine Mitte. Ein Rand ist
+// keine Schrift; was fuer die Lesbarkeit kleiner Texte richtig ist, ist es fuer
+// eine Umrisslinie nicht.
 export function btnOutline(T, size = 'md') {
   return {
-    background: 'transparent', color: T.textSecondary, border: `1px solid ${T.textMuted}`,
+    background: 'transparent', color: T.textSecondary, border: `1px solid ${T.borderStrong}`,
     borderRadius: RADIUS.pill, fontWeight: 600, cursor: 'pointer', display: 'inline-flex',
     alignItems: 'center', justifyContent: 'center', gap: 8,
     transition: 'border-color .15s, color .15s, transform .1s',
@@ -184,8 +210,9 @@ export function surfaceSoft(T) {
 // Zwei Toene, und der Unterschied ist eine Aussage: "aktiv" traegt Gruen und
 // bekommt nur, was heute Handlung verlangt. Wuerde jeder Wert gruen leuchten,
 // saehe alles gleich dringend aus - genau das soll die eine Akzentfarbe verhindern.
-// Beide Kombinationen sind nachgerechnet (hell 4.61:1 / 5.96:1, dunkel 5.57:1 /
-// 5.15:1) und liegen damit ueber 4.5:1.
+// Beide Kombinationen sind nachgerechnet (hell 12.3:1 / 5.96:1, dunkel 15.4:1 /
+// 5.15:1) und liegen damit ueber 4.5:1. Die neutralen Werte stammen aus
+// T.textSecondary und sind beim Aufhellen der Nebenschrift mitgewandert.
 export function pill(T, ton = 'neutral') {
   const aktiv = ton === 'aktiv';
   return {
