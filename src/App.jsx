@@ -699,14 +699,22 @@ export default function VokabelTrainer() {
     // vergessene Karte, oder der Zehn-Minuten-Schritt der festen Anfangsphase
     // (Intervall 0) - ein Datum kann keine zehn Minuten ausdruecken, das
     // Wiederkehren in derselben Sitzung ist die Entsprechung dazu. In der
-    // Fehlerkartei gibt es kein Intervall, das drillCard() aendern koennte;
-    // dort entscheidet das Tagespensum: Die Karte kommt wieder, bis sie heute
-    // ihre drei sicheren Durchgaenge hat. Das gilt auch nach "Gut" - sonst
-    // kaeme sie pro Sitzung nur einmal dran und die drei waeren gar nicht zu
-    // erreichen. "Nochmal"/"Schwer" setzen den Tag auf null zurueck und sind
-    // damit automatisch mit abgedeckt.
+    // Fehlerkartei: hier kommt KEINE Karte in derselben Sitzung noch einmal.
+    // Ein Durchlauf ist eine Sitzung - danach ist man wieder draussen und
+    // startet den Stapel erneut, wenn man den naechsten Durchgang will. Die
+    // drei Durchgaenge eines Tages entstehen also aus drei Starts, nicht
+    // daraus, dass dieselbe Karte dreimal hintereinander erscheint.
+    //
+    // Vorher lief es genau andersherum (Karte wiederholen, bis das Tagespensum
+    // voll ist). Das haelt einen in einer Sitzung fest, bis alles abgearbeitet
+    // ist, und massiertes Wiederholen am Stueck ist ohnehin das, was die
+    // Zwei-Stufen-Regel gerade NICHT belohnen soll - drei Starts ueber den Tag
+    // verteilt sind das, was gemeint war.
+    //
+    // "Nochmal"/"Schwer" bilden keine Ausnahme: Sie setzen den Tageszaehler
+    // auf null, die Karte steht also beim naechsten Start wieder bereit.
     const nochUnfertig = istFehlerkartei
-      ? !tagGeschlossen(updated)
+      ? false
       : (ratingKey === 'again' || updated.interval === 0);
     if (nochUnfertig) {
       const pos = Math.min(rest.length, 3);
