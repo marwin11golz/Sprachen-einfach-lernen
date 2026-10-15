@@ -2,8 +2,7 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   Plus, Search, BarChart3, Layers, CheckCircle2, XCircle, Sun, Moon, X,
   Download, Trash2, Volume2, Upload, BookOpen, PenLine, ChevronRight, Repeat,
-  MinusCircle, Star, AlertTriangle, Settings, ArrowUp, ArrowDown, CheckSquare, Square, ChevronLeft,
-} from 'lucide-react';
+  MinusCircle, Star, AlertTriangle, Settings, ArrowUp, ArrowDown, CheckSquare, Square, ChevronLeft, Pencil,} from 'lucide-react';
 
 import {
   levenshtein, todayISO, cardSides, relativerTag,
@@ -26,6 +25,7 @@ import { useAuth } from './hooks/useAuth.js';
 import { useCloudSync } from './hooks/useCloudSync.js';
 import AuthScreen from './ui/AuthScreen.jsx';
 import SyncBadge from './ui/SyncBadge.jsx';
+import KarteBearbeiten from './ui/KarteBearbeiten.jsx';
 import SessionDone from './ui/SessionDone.jsx';
 import StreakCelebration from './ui/StreakCelebration.jsx';
 
@@ -39,6 +39,12 @@ const DECK_FEHLER = '__fehlerkartei';
 // Platzhalter dieser Hoehe je Zeile, und weicht der Wert ab, springt die Liste
 // beim Bildlauf. Deshalb kappen die Zeilen langen Text, statt umzubrechen.
 const ZEILE_H = 44;
+
+// Breite der Knopfspalte rechts in der Kartenliste (Bearbeiten + Loeschen).
+// Steht fest, weil die Kopfzeile denselben Platzhalter fuehrt und die Spalte
+// in der Mehrfachauswahl leer bleibt - waere sie elastisch, spraenge die
+// ganze Liste beim Umschalten um ihre Breite.
+const AKTION_W = 54;
 
 // Sortierfelder der Kartenliste. "neu" hat keinen Wert-Ausleser, weil es die
 // Anlagereihenfolge rueckwaerts ist - siehe sortiert().
@@ -90,7 +96,7 @@ function SortKopf({ T, feld, label, sortierung, onSort, style }) {
 //
 // Die feste Hoehe ist Bedingung fuer das Fenster-Rendering: die Platzhalter
 // oben und unten rechnen mit ihr. Deshalb kappt der Text, statt umzubrechen.
-function KartenZeile({ T, card, auswahlModus, markiert, onMarkieren, onLoeschen }) {
+function KartenZeile({ T, card, auswahlModus, markiert, onMarkieren, onBearbeiten, onLoeschen }) {
   const seiten = cardSides(card);
   const titel = card.type === 'gap'
     ? revealSentence(card.sentence)
@@ -140,14 +146,23 @@ function KartenZeile({ T, card, auswahlModus, markiert, onMarkieren, onLoeschen 
       }}>
         {card.totalReviews > 0 ? `${card.totalReviews} Wdh.` : 'neu'}
       </span>
-      {!auswahlModus ? (
-        <button className="press" onClick={onLoeschen} aria-label={`Karte löschen: ${titel}`}
-          style={{ background: 'none', border: 'none', cursor: 'pointer', color: T.textSecondary, flexShrink: 0, padding: 4, display: 'flex' }}>
-          <Trash2 size={15} />
-        </button>
-      ) : (
-        <span style={{ width: 28, flexShrink: 0 }} />
-      )}
+      {/* Feste Breite, auch leer: In der Mehrfachauswahl verschwinden die
+          Knoepfe, die Spalte darf aber nicht mitwandern - sonst springt die
+          ganze Liste beim Umschalten. */}
+      <span style={{ display: 'flex', gap: SPACE.xs, width: AKTION_W, flexShrink: 0, justifyContent: 'flex-end' }}>
+        {!auswahlModus && (
+          <>
+            <button className="press" onClick={onBearbeiten} aria-label={`Karte bearbeiten: ${titel}`}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', color: T.textSecondary, padding: 4, display: 'flex' }}>
+              <Pencil size={15} />
+            </button>
+            <button className="press" onClick={onLoeschen} aria-label={`Karte löschen: ${titel}`}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', color: T.textSecondary, padding: 4, display: 'flex' }}>
+              <Trash2 size={15} />
+            </button>
+          </>
+        )}
+      </span>
     </div>
   );
 }
@@ -304,7 +319,7 @@ export default function VokabelTrainer() {
     flipped, setFlipped,
     newCardsPerDay, setNewCardsPerDay,
     loaded, storageWarning,
-    addCards, rateCard, drillCard, deleteCard, deleteCards, importData,
+    addCards, rateCard, drillCard, editCard, deleteCard, deleteCards, importData,
   } = store;
 
   const auth = useAuth();
@@ -314,6 +329,8 @@ export default function VokabelTrainer() {
 
   const [theme, setTheme] = useState('light');
   const [toast, setToast] = useState(null);
+  // Die Karte, die gerade bearbeitet wird (null = kein Dialog offen).
+  const [bearbeiteteKarte, setBearbeiteteKarte] = useState(null);
 
   const [addTab, setAddTab] = useState('vocab');
   const [addText, setAddText] = useState('');
@@ -1803,7 +1820,7 @@ export default function VokabelTrainer() {
               <SortKopf T={T} feld="stapel" label="Stapel" sortierung={sortierung} onSort={sortierenNach} style={{ width: 150, flexShrink: 0 }} />
               <SortKopf T={T} feld="faellig" label="Fällig" sortierung={sortierung} onSort={sortierenNach} style={{ width: 110, flexShrink: 0, justifyContent: 'flex-end' }} />
               <SortKopf T={T} feld="wdh" label="Wdh." sortierung={sortierung} onSort={sortierenNach} style={{ width: 90, flexShrink: 0, justifyContent: 'flex-end' }} />
-              <span style={{ width: 28, flexShrink: 0 }} />
+              <span style={{ width: AKTION_W, flexShrink: 0 }} />
             </div>
 
             {/* Gezeichnet wird nur der sichtbare Ausschnitt; die beiden
@@ -1816,6 +1833,7 @@ export default function VokabelTrainer() {
                   auswahlModus={auswahlModus}
                   markiert={markiert.has(c.id)}
                   onMarkieren={() => markierungUmschalten(c.id)}
+                  onBearbeiten={() => setBearbeiteteKarte(c)}
                   onLoeschen={() => deleteCard(c.id)}
                 />
               ))}
@@ -1885,6 +1903,23 @@ export default function VokabelTrainer() {
           })}
         </div>
       </div>
+
+      {bearbeiteteKarte && (
+        <KarteBearbeiten
+          T={T}
+          card={bearbeiteteKarte}
+          onAbbrechen={() => setBearbeiteteKarte(null)}
+          onSpeichern={(felder) => {
+            const neu = editCard(bearbeiteteKarte.id, felder);
+            setBearbeiteteKarte(null);
+            // Aendert sich die Sprache, wechselt die Karte den Stapel und
+            // verschwindet aus der gerade geoeffneten Liste. Das wortlos zu
+            // tun laese sich als "geloescht" lesen - also sagen, wohin.
+            const gewandert = neu && deckKeyOf(neu) !== deckKeyOf(bearbeiteteKarte);
+            showToast(gewandert ? `Karte verschoben: ${deckLabelOf(neu)}` : 'Karte gespeichert');
+          }}
+        />
+      )}
 
       {toast && (
         <div style={{

@@ -1,7 +1,8 @@
 // Besitzt den gesamten Vokabel-Zustand: Karten, Lernaktivität, Einstellungen.
 //
 // Nach außen gibt es bewusst KEIN rohes setCards, sondern nur benannte
-// Absichten: addCards / rateCard / drillCard / deleteCard / importData. Genau
+// Absichten: addCards / rateCard / drillCard / editCard / deleteCard /
+// importData. Genau
 // das garantiert, dass jede Änderung ihren Zeitstempel bekommt - vergisst man
 // das an einer einzigen Stelle, gewinnt beim Abgleich später der falsche
 // Stand.
@@ -12,6 +13,11 @@ import { loadLocal, saveLocal, migrateCard } from '../lib/storage.js';
 import { mergeCards, combinedActivity, purgeOldTombstones } from '../lib/merge.js';
 
 const stamp = (card) => ({ ...card, updatedAt: new Date().toISOString(), deleted: card.deleted || false });
+
+// Was Bearbeiten anfassen darf: ausschliesslich der Inhalt der Karte. Alles
+// andere - Terminierung, Statistik, die Zaehler der Fehlerkartei - bleibt
+// aussen vor, siehe editCard.
+const INHALTSFELDER = ['front', 'back', 'langA', 'langB', 'sentence', 'answer', 'language'];
 
 export function useVocabStore() {
   const [allCards, setAllCards] = useState([]);
@@ -118,6 +124,27 @@ export function useVocabStore() {
     return updated;
   }, [bump]);
 
+  // Inhalt einer Karte aendern - Lernstand behalten.
+  //
+  // Die Weissliste ist der eigentliche Punkt dieser Funktion, nicht das
+  // Zusammenfuehren: Ohne sie koennte ein Aufrufer ueber denselben Weg
+  // dueDate, stability oder totalReviews ueberschreiben, und "Tippfehler
+  // korrigieren" wuerde still den Zeitplan verstellen. Genau das soll
+  // Bearbeiten NICHT koennen. Eine Karte, deren Vokabel man korrigiert, ist
+  // dieselbe Karte - Anki setzt beim Bearbeiten ebenfalls nichts zurueck.
+  const editCard = useCallback((id, felder) => {
+    const live = cardsRef.current.find(c => c.id === id);
+    if (!live) return null;
+    const erlaubt = {};
+    for (const k of INHALTSFELDER) {
+      if (Object.prototype.hasOwnProperty.call(felder, k)) erlaubt[k] = felder[k];
+    }
+    const updated = stamp({ ...live, ...erlaubt });
+    setAllCards(prev => prev.map(c => (c.id === id ? updated : c)));
+    bump();
+    return updated;
+  }, [bump]);
+
   // Löschen heißt: als gelöscht markieren, nicht entfernen. Nur so erfährt
   // das andere Gerät überhaupt davon.
   const deleteCard = useCallback((id) => {
@@ -181,6 +208,6 @@ export function useVocabStore() {
     prefsUpdatedAt, lastUserId, lastSyncAt,
     loaded, storageWarning,
     revision,
-    addCards, rateCard, drillCard, deleteCard, deleteCards, importData, applyRemote,
+    addCards, rateCard, drillCard, editCard, deleteCard, deleteCards, importData, applyRemote,
   };
 }
