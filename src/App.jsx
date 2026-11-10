@@ -709,7 +709,20 @@ export default function VokabelTrainer() {
       ? !tagGeschlossen(updated)
       : (ratingKey === 'again' || updated.interval === 0);
     if (nochUnfertig) {
-      const pos = Math.min(rest.length, 3);
+      // Wohin die Karte zurueckkommt: Was eben nicht sass, soll bald wieder
+      // dran sein - drei Karten weiter. In der Fehlerkartei kommt aber auch
+      // eine sicher gewusste Karte zurueck (ihr Tagespensum ist noch offen),
+      // und dort war dieselbe feste Stelle der Fehler: Vier Karten kreisten
+      // unter sich, bis alle ihre drei Durchgaenge hatten, erst dann rueckte
+      // die fuenfte nach. Nach "Gut"/"Einfach" landet sie deshalb an einer
+      // zufaelligen Stelle im ganzen Rest. Der Mindestabstand bleibt, damit
+      // sie nicht sofort noch einmal kommt und aus dem Kurzzeitgedaechtnis
+      // beantwortet wird.
+      const min = Math.min(rest.length, 3);
+      const gewusst = ratingKey === 'good' || ratingKey === 'easy';
+      const pos = istFehlerkartei && gewusst
+        ? min + Math.floor(Math.random() * (rest.length - min + 1))
+        : min;
       rest = [...rest.slice(0, pos), updated, ...rest.slice(pos)];
     }
     setQueue(rest);
